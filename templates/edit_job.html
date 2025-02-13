@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Edit Job - {{ job_id }}</h1>
+<form method="post">
+    {{ form.hidden_tag() }}
+    <!-- Form fields same as add_job.html -->
+    <div class="form-group">
+        {{ form.job_id.label }} {{ form.job_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.description.label }} {{ form.description(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.duration.label }} {{ form.duration(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.equipment_id.label }} {{ form.equipment_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.required_skills.label }} {{ form.required_skills(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.precedence.label }} {{ form.precedence(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+</form>
+{% endblock %}

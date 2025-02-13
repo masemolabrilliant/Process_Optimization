@@ -1,0 +1,27 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Tools Schema",
+    "description": "Schema for tools data",
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": ["tool_id", "name", "quantity"],
+      "properties": {
+        "tool_id": {
+          "type": "string",
+          "description": "Unique identifier for the tool"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name or description of the tool"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tools available"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+  

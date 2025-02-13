@@ -1,0 +1,8 @@
+# Ignore documents folder
+docs
+
+# Ignore virtual environment folder
+venv
+
+# Ignore zip package
+shutdown_scheduler.zip

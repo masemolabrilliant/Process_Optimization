@@ -1,0 +1,28 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Equipment Schema",
+    "description": "Schema for equipment data",
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": ["equipment_id", "name", "priority"],
+      "properties": {
+        "equipment_id": {
+          "type": "string",
+          "description": "Unique identifier for the equipment"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name or description of the equipment"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Priority level of the equipment (1 for highest priority)"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+  

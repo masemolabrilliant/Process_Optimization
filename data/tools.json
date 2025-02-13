@@ -1,0 +1,37 @@
+[
+    {
+        "tool_id": "TOOL001",
+        "name": "Wrench Set",
+        "quantity": 5
+    },
+    {
+        "tool_id": "TOOL002",
+        "name": "Multimeter",
+        "quantity": 3
+    },
+    {
+        "tool_id": "TOOL003",
+        "name": "Welding Machine",
+        "quantity": 2
+    },
+    {
+        "tool_id": "TOOL004",
+        "name": "Calibration Kit",
+        "quantity": 4
+    },
+    {
+        "tool_id": "TOOL005",
+        "name": "Hydraulic Press",
+        "quantity": 1
+    },
+    {
+        "tool_id": "TOOL006",
+        "name": "Pneumatic Tester",
+        "quantity": 2
+    },
+    {
+        "tool_id": "TOOL007",
+        "name": "Oscilloscope",
+        "quantity": 2
+    }
+]

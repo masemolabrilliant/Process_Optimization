@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Welcome to the Shutdown Maintenance Scheduling Application</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Quick Actions</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="{{ url_for('view_schedule') }}">View Current Schedule</a></li>
+                        <li class="list-group-item"><a href="{{ url_for('optimize') }}">Run Optimization</a></li>
+                        <li class="list-group-item"><a href="{{ url_for('view_metrics') }}">View Metrics</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Data Management</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="{{ url_for('view_jobs') }}">Manage Jobs</a></li>
+                        <li class="list-group-item"><a href="{{ url_for('view_technicians') }}">Manage Technicians</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2 class="h5 mb-0">About</h2>
+        </div>
+        <div class="card-body">
+            <p>This application helps manage and optimize shutdown maintenance schedules. Use the links above to view the current schedule, run optimizations, manage jobs and technicians, and view performance metrics.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

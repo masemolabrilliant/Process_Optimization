@@ -1,0 +1,74 @@
+[
+    {
+        "job_id": "JOB003",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB001",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB004",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB002",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB018",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB006",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB008",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB015",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB005",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB009",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB017",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB007",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB010",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB011",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB013",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB012",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB016",
+        "reason": "Could not schedule any splits due to resource constraints."
+    },
+    {
+        "job_id": "JOB014",
+        "reason": "Could not schedule any splits due to resource constraints."
+    }
+]

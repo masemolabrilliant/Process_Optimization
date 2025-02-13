@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Optimizer Comparison</h1>
+
+    {% if comparison %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        {% for optimizer in optimizers %}
+                            <th>{{ optimizer }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric, values in comparison.items() %}
+                        <tr>
+                            <td>{{ metric|replace('_', ' ')|title }}</td>
+                            {% for optimizer in optimizers %}
+                                <td>
+                                    {% if optimizer in values %}
+                                        {% if metric in ['total_duration', 'makespan', 'avg_equipment_utilization'] %}
+                                            {{ "%.2f"|format(values[optimizer]) }}
+                                        {% else %}
+                                            {{ values[optimizer] }}
+                                        {% endif %}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2 class="mt-5 mb-3">Interpretation</h2>
+        <ul class="list-group">
+            <li class="list-group-item">
+                <strong>Total Duration:</strong> The sum of all job durations. Lower is generally better.
+            </li>
+            <li class="list-group-item">
+                <strong>Makespan:</strong> The total time from the start of the first job to the end of the last job. Lower indicates a more compact schedule.
+            </li>
+            <li class="list-group-item">
+                <strong>Average Equipment Utilization:</strong> The average percentage of time that equipment is in use. Higher indicates better resource utilization.
+            </li>
+            <li class="list-group-item">
+                <strong>Number of Jobs:</strong> The total number of scheduled jobs. Higher might indicate that the optimizer was able to fit more jobs into the schedule.
+            </li>
+        </ul>
+
+        <div class="mt-4">
+            <h3>Visualizations</h3>
+            <p>Add comparison charts here if available.</p>
+            <!-- Example: 
+            <img src="{{ url_for('visualization_image', filename='optimizer_comparison.png') }}" alt="Optimizer Comparison" class="img-fluid mt-3">
+            -->
+        </div>
+
+    {% else %}
+        <div class="alert alert-warning">
+            No comparison data available. Please ensure that you have run the optimizers and generated the necessary schedules.
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('view_schedule') }}" class="btn btn-primary">View Current Schedule</a>
+        <a href="{{ url_for('optimize') }}" class="btn btn-secondary">Run Optimization</a>
+    </div>
+</div>
+{% endblock %}

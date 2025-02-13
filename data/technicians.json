@@ -1,0 +1,47 @@
+[
+    {
+        "tech_id": "TECH001",
+        "name": "Fungai Jinga",
+        "skills": [
+            "mechanical",
+            "hydraulics"
+        ],
+        "hourly_rate": 50.0
+    },
+    {
+        "tech_id": "TECH002",
+        "name": "Plackie Mbizi",
+        "skills": [
+            "electrical",
+            "instrumentation"
+        ],
+        "hourly_rate": 55.0
+    },
+    {
+        "tech_id": "TECH003",
+        "name": "Japh Zimowa",
+        "skills": [
+            "mechanical",
+            "welding"
+        ],
+        "hourly_rate": 48.0
+    },
+    {
+        "tech_id": "TECH004",
+        "name": "Samson Phiri",
+        "skills": [
+            "electrical",
+            "automation"
+        ],
+        "hourly_rate": 60.0
+    },
+    {
+        "tech_id": "TECH006",
+        "name": "Grantino Chinakure",
+        "skills": [
+            "instrumentation",
+            "calibration"
+        ],
+        "hourly_rate": 58.0
+    }
+]

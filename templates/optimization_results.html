@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Optimization Results</h1>
+    
+    <div class="alert alert-success">
+        Optimization completed using {{ algorithm }} algorithm.
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Optimization Metrics</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Optimization Time
+                            <span class="badge bg-primary rounded-pill">{{ optimization_time|round(2) }} seconds</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Initial Makespan
+                            <span class="badge bg-secondary rounded-pill">{{ initial_makespan }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Optimized Makespan
+                            <span class="badge bg-success rounded-pill">{{ optimized_makespan }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Makespan Reduction
+                            <span class="badge bg-info rounded-pill">{{ makespan_reduction|round(2) }}%</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Next Steps</h2>
+                </div>
+                <div class="card-body">
+                    <p>To explore the optimized schedule in detail:</p>
+                    <ul>
+                        <li><a href="{{ url_for('view_schedule') }}">View the optimized schedule</a></li>
+                        <li><a href="{{ url_for('compare_initial_optimized', optimizer=algorithm) }}">Compare with the initial schedule</a></li>
+                        <li><a href="{{ url_for('view_metrics') }}">View detailed metrics</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Initial Schedule Gantt Chart</h2>
+            <div id="initial-gantt"></div>
+        </div>
+        <div class="col-md-6">
+            <h2>Optimized Schedule Gantt Chart</h2>
+            <div id="optimized-gantt"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        var initialGanttJSON = {{ initial_gantt | tojson }};
+        Plotly.newPlot('initial-gantt', initialGanttJSON.data, initialGanttJSON.layout);
+    
+        var optimizedGanttJSON = {{ optimized_gantt | tojson }};
+        Plotly.newPlot('optimized-gantt', optimizedGanttJSON.data, optimizedGanttJSON.layout);
+    </script>
+
+    <div class="mt-4">
+        <a href="{{ url_for('optimize') }}" class="btn btn-primary">Run Another Optimization</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Return to Home</a>
+    </div>
+</div>
+{% endblock %}

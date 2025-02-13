@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1>Schedule Comparison: Initial vs {{ optimizer|capitalize }}</h1>
+    
+    <table class="table table-bordered table-hover">
+        <thead class="thead-light">
+            <tr>
+                <th>Metric</th>
+                <th>Initial Schedule</th>
+                <th>{{ optimizer|capitalize }} Schedule</th>
+                <th>Difference</th>
+                <th>Percentage Change</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for metric, data in comparison.items() %}
+            <tr>
+                <td>{{ metric|replace('_', ' ')|title }}</td>
+                <td>{{ "%.2f"|format(data['schedule1']) }}</td>
+                <td>{{ "%.2f"|format(data['schedule2']) }}</td>
+                <td>{{ "%.2f"|format(data['difference']) }}</td>
+                <td>
+                    {% if data['percentage_change'] == 'inf' %}
+                        N/A
+                    {% else %}
+                        {{ "%.2f%%"|format(data['percentage_change']|float) }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="mt-4">
+        <h2>Interpretation</h2>
+        <ul>
+            <li><strong>Total Duration:</strong> The sum of all job durations. A lower value is generally better.</li>
+            <li><strong>Makespan:</strong> The total time from the start of the first job to the end of the last job. A lower value indicates a more compact schedule.</li>
+            <li><strong>Average Equipment Utilization:</strong> The average percentage of time that equipment is in use. A higher value indicates better resource utilization.</li>
+            <li><strong>Number of Jobs:</strong> The total number of scheduled jobs. A higher value might indicate that the optimizer was able to fit more jobs into the schedule.</li>
+        </ul>
+        <p>Positive differences and percentage changes indicate an increase in the metric for the optimized schedule compared to the initial schedule. Whether this is good or bad depends on the specific metric.</p>
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ url_for('view_schedule') }}" class="btn btn-primary">View Current Schedule</a>
+        <a href="{{ url_for('optimize') }}" class="btn btn-secondary">Run Another Optimization</a>
+    </div>
+</div>
+{% endblock %}

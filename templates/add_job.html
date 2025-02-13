@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Add New Job</h1>
+<form method="post">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+        {{ form.job_id.label }} {{ form.job_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.description.label }} {{ form.description(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.duration.label }} {{ form.duration(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.equipment_id.label }} {{ form.equipment_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.required_skills.label }} {{ form.required_skills(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.required_tools.label }} {{ form.required_tools(class="form-control") }}
+        <small class="form-text text-muted">Format: tool_id:quantity (e.g., TOOL001:2, TOOL002:1)</small>
+    </div>
+    <div class="form-group">
+        {{ form.required_materials.label }} {{ form.required_materials(class="form-control") }}
+        <small class="form-text text-muted">Format: material_id:quantity (e.g., MAT001:5.5, MAT002:3.0)</small>
+    </div>
+    <div class="form-group">
+        {{ form.precedence.label }} {{ form.precedence(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+</form>
+{% endblock %}

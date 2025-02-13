@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .job-details {
+        font-size: 0.9em;
+    }
+    .job-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+    .job-row > div {
+        flex: 1;
+    }
+    .equipment-group {
+        margin-bottom: 20px;
+    }
+</style>
+
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h2>Schedule Gantt Chart</h2>
+            {% if gantt_chart %}
+            <div id="gantt-chart" style="height: 600px;"></div>
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <script>
+                var graphJSON = {{ gantt_chart | safe }};
+                Plotly.newPlot('gantt-chart', graphJSON.data, graphJSON.layout);
+            </script>
+            {% else %}
+            <p>No Gantt chart available. Run the scheduler or optimizer first.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>Schedule Details</h3>
+            {% if equipment_data and schedule %}
+                {% set priorities = [1, 2, 3] %}
+                {% for priority in priorities %}
+                    <h4>Priority {{ priority }}</h4>
+                    {% for equipment in equipment_data if equipment.priority == priority %}
+                        <div class="equipment-group">
+                            <h5>{{ equipment.name }}</h5>
+                            <div class="job-details">
+                                <div class="job-row font-weight-bold">
+                                    <div>Job ID</div>
+                                    <div>Start Time</div>
+                                    <div>End Time</div>
+                                    <div>Assigned Technicians</div>
+                                </div>
+                                {% for job in schedule if job.equipment_id == equipment.equipment_id %}
+                                    <div class="job-row">
+                                        <div>{{ job.job_id }}</div>
+                                        <div>{{ job.scheduled_start_time }}</div>
+                                        <div>{{ job.scheduled_end_time }}</div>
+                                        <div>{{ job.assigned_technicians|join(', ') }}</div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+            {% else %}
+                <p>No schedule or equipment data available. Please run the scheduler first.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<div class="mt-4">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+</div>
+{% endblock %}

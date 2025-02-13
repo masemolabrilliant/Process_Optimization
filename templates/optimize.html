@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Optimization Controls</h1>
+<form method="post">
+    <div class="form-group">
+        <label for="algorithm">Select Optimization Algorithm:</label>
+        <select name="algorithm" class="form-control">
+            <option value="MILP">MILP</option>
+            <option value="GA">Genetic Algorithm</option>
+            <option value="ORTOOLS">Google OR Tools</option>
+            <option value="SA">Simulated Annealing Algorithm</option>
+            <!-- may add other algorithms as needed -->
+        </select>
+    </div>
+    <!-- to add other optimization parameters as needed -->
+    <button type="submit" class="btn btn-primary">Run Optimization</button>
+</form>
+{% endblock %}

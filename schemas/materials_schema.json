@@ -1,0 +1,27 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Materials Schema",
+    "description": "Schema for materials data",
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": ["material_id", "name", "quantity"],
+      "properties": {
+        "material_id": {
+          "type": "string",
+          "description": "Unique identifier for the material"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name or description of the material"
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total quantity of the material available"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+  

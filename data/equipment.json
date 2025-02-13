@@ -1,0 +1,42 @@
+[
+    {
+        "equipment_id": "EQUIP001",
+        "name": "Compressor A",
+        "priority": 1
+    },
+    {
+        "equipment_id": "EQUIP002",
+        "name": "Pump B",
+        "priority": 1
+    },
+    {
+        "equipment_id": "EQUIP003",
+        "name": "Conveyor C",
+        "priority": 2
+    },
+    {
+        "equipment_id": "EQUIP004",
+        "name": "Heat Exchanger D",
+        "priority": 2
+    },
+    {
+        "equipment_id": "EQUIP005",
+        "name": "Boiler E",
+        "priority": 2
+    },
+    {
+        "equipment_id": "EQUIP006",
+        "name": "Valve F",
+        "priority": 3
+    },
+    {
+        "equipment_id": "EQUIP007",
+        "name": "Generator G",
+        "priority": 3
+    },
+    {
+        "equipment_id": "EQUIP008",
+        "name": "Cooling Tower H",
+        "priority": 3
+    }
+]

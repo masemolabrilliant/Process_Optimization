@@ -1,0 +1,35 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Technicians Schema",
+    "description": "Schema for technicians data",
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": ["tech_id", "name", "skills", "hourly_rate"],
+      "properties": {
+        "tech_id": {
+          "type": "string",
+          "description": "Unique identifier for the technician"
+        },
+        "name": {
+          "type": "string",
+          "description": "Technician's name"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Skill possessed by the technician"
+          },
+          "description": "List of skills the technician possesses"
+        },
+        "hourly_rate": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cost per hour for the technician"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+  

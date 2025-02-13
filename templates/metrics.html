@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Schedule Metrics Report</h1>
+    
+    {% if metrics %}
+    <div class="alert alert-info">
+        This report is based on the {{ metrics.schedule_type|default('current', true) }} schedule.
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Overall Metrics</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Jobs Scheduled
+                            <span class="badge bg-primary rounded-pill">{{ metrics.total_jobs|default('N/A') }}</span>
+                        </li>
+                        {% if metrics.total_technician_hours is defined %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Technician Hours
+                            <span class="badge bg-primary rounded-pill">{{ "%.2f"|format(metrics.total_technician_hours) }}</span>
+                        </li>
+                        {% endif %}
+                        {% if metrics.total_cost is defined %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Cost
+                            <span class="badge bg-primary rounded-pill">${{ "%.2f"|format(metrics.total_cost) }}</span>
+                        </li>
+                        {% endif %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Labor Cost
+                            <span class="badge bg-primary rounded-pill">${{ "%.2f"|format(metrics.total_labor_cost|default(0)) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Completion Time
+                            <span class="badge bg-primary rounded-pill">
+                                {% if metrics.total_completion_time %}
+                                    {% set time_parts = metrics.total_completion_time.split(', ') %}
+                                    {% set days = time_parts[0].split()[0]|int %}
+                                    {% set time = time_parts[1].split(':') %}
+                                    {% set hours = time[0]|int %}
+                                    {% set minutes = time[1]|int %}
+                                    {{ days }} day{% if days != 1 %}s{% endif %},
+                                    {{ hours }} hour{% if hours != 1 %}s{% endif %}
+                                    {% if minutes > 0 %}, {{ minutes }} minute{% if minutes != 1 %}s{% endif %}{% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Average Job Duration
+                            <span class="badge bg-primary rounded-pill">{{ "%.2f"|format(metrics.average_job_duration|default(0)) }} hours</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        {% if metrics.equipment_utilization is defined and metrics.equipment_utilization %}
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Equipment Utilization</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                    {% for equip_id, utilization in metrics.equipment_utilization.items() %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ equip_id }}
+                            <span class="badge bg-success rounded-pill">{{ "%.2f"|format(utilization|default(0)) }}%</span>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        {% if metrics.tool_utilization is defined and metrics.tool_utilization %}
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Tool Utilization</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                    {% for tool_id, utilization in metrics.tool_utilization.items() %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ tool_id }}
+                            <span class="badge bg-info rounded-pill">{{ "%.2f"|format(utilization|default(0)) }}%</span>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if metrics.material_consumption is defined and metrics.material_consumption %}
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Material Consumption</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                    {% for material_id, consumption in metrics.material_consumption.items() %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ material_id }}
+                            <span class="badge bg-warning rounded-pill">{{ "%.2f"|format(consumption|default(0)) }}%</span>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <h2 class="mb-4">Visualizations</h2>
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Technician Utilization</h3>
+                </div>
+                <div class="card-body">
+                    <img src="{{ url_for('visualization_image', filename='technician_utilization.png') }}" alt="Technician Utilization" class="img-fluid">
+                    <p class="mt-2">This chart shows the utilization rate of each technician. Higher bars indicate more efficient use of technician time.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Equipment Utilization</h3>
+                </div>
+                <div class="card-body">
+                    <img src="{{ url_for('visualization_image', filename='equipment_utilization.png') }}" alt="Equipment Utilization" class="img-fluid">
+                    <p class="mt-2">This chart displays the utilization rate of each piece of equipment. Higher utilization indicates more efficient use of resources.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Tool Utilization</h3>
+                </div>
+                <div class="card-body">
+                    <img src="{{ url_for('visualization_image', filename='tool_utilization.png') }}" alt="Tool Utilization" class="img-fluid">
+                    <p class="mt-2">This chart shows the usage rate of each tool. Higher utilization may indicate potential bottlenecks or need for additional tools.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Material Consumption</h3>
+                </div>
+                <div class="card-body">
+                    <img src="{{ url_for('visualization_image', filename='material_consumption.png') }}" alt="Material Consumption" class="img-fluid">
+                    <p class="mt-2">This chart illustrates the consumption of different materials. It helps in identifying which materials are used most frequently.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        No metrics data available. Please run the scheduler or an optimization first.
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('view_schedule') }}" class="btn btn-primary">View Schedule</a>
+        <a href="{{ url_for('optimize') }}" class="btn btn-secondary">Run Optimization</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+    </div>
+</div>
+{% endblock %}

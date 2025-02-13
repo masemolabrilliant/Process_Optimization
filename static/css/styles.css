@@ -1,0 +1,14 @@
+/* styles.css */
+
+/* Add custom styles here */
+body {
+    /* Optional: customize the body */
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.table th, .table td {
+    vertical-align: middle;
+}

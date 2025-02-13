@@ -1,0 +1,96 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Jobs Schema",
+    "description": "Schema for jobs data",
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": [
+        "job_id",
+        "description",
+        "equipment_id",
+        "duration",
+        "required_skills",
+        "required_tools",
+        "required_materials",
+        "precedence"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "description": "Unique identifier for the job"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the job"
+        },
+        "equipment_id": {
+          "type": "string",
+          "description": "Identifier of the equipment associated with the job"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Duration of the job in hours"
+        },
+        "required_skills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Skill required for the job"
+          },
+          "description": "List of skills required for the job"
+        },
+        "required_tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tool_id", "quantity"],
+            "properties": {
+              "tool_id": {
+                "type": "string",
+                "description": "Identifier of the required tool"
+              },
+              "quantity": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Quantity of the tool required"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "List of tools required with quantities"
+        },
+        "required_materials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["material_id", "quantity"],
+            "properties": {
+              "material_id": {
+                "type": "string",
+                "description": "Identifier of the required material"
+              },
+              "quantity": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Quantity of the material required"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "List of materials required with quantities"
+        },
+        "precedence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Job ID of a predecessor job"
+          },
+          "description": "List of job IDs that must be completed before this job"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+  

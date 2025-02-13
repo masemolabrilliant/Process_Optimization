@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Add New Technician</h1>
+<form method="post">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+        {{ form.tech_id.label }} {{ form.tech_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.name.label }} {{ form.name(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.hourly_rate.label }} {{ form.hourly_rate(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.skills.label }} {{ form.skills(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.workdays.label }} {{ form.workdays(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.workday_start.label }} {{ form.workday_start(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.workday_end.label }} {{ form.workday_end(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+</form>
+{% endblock %}

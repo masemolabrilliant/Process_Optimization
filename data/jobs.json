@@ -1,0 +1,230 @@
+[
+    {
+        "job_id": "JOB001",
+        "description": "Inspect Compressor A",
+        "equipment_id": "EQUIP001",
+        "duration": 4,
+        "required_skills": ["mechanical", "electrical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB002",
+        "description": "Replace Gaskets on Compressor A",
+        "equipment_id": "EQUIP001",
+        "duration": 6,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [
+            {"material_id": "MAT002", "quantity": 5}
+        ],
+        "precedence": ["JOB001"]
+    },
+    {
+        "job_id": "JOB003",
+        "description": "Electrical Testing on Pump B",
+        "equipment_id": "EQUIP002",
+        "duration": 3,
+        "required_skills": ["electrical"],
+        "required_tools": [
+            {"tool_id": "TOOL002", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB004",
+        "description": "Calibrate Instruments on Pump B",
+        "equipment_id": "EQUIP002",
+        "duration": 2,
+        "required_skills": ["instrumentation"],
+        "required_tools": [
+            {"tool_id": "TOOL004", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": ["JOB003"]
+    },
+    {
+        "job_id": "JOB005",
+        "description": "Weld Crack on Conveyor C",
+        "equipment_id": "EQUIP003",
+        "duration": 5,
+        "required_skills": ["welding"],
+        "required_tools": [
+            {"tool_id": "TOOL003", "quantity": 1}
+        ],
+        "required_materials": [
+            {"material_id": "MAT003", "quantity": 20}
+        ],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB006",
+        "description": "Replace Filter on Heat Exchanger D",
+        "equipment_id": "EQUIP004",
+        "duration": 3,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [
+            {"material_id": "MAT006", "quantity": 2}
+        ],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB007",
+        "description": "Lubricate Bearings on Conveyor C",
+        "equipment_id": "EQUIP003",
+        "duration": 2,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [
+            {"material_id": "MAT001", "quantity": 10}
+        ],
+        "precedence": ["JOB005"]
+    },
+    {
+        "job_id": "JOB008",
+        "description": "Inspect Boiler E",
+        "equipment_id": "EQUIP005",
+        "duration": 4,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB009",
+        "description": "Test Automation System on Boiler E",
+        "equipment_id": "EQUIP005",
+        "duration": 3,
+        "required_skills": ["automation"],
+        "required_tools": [
+            {"tool_id": "TOOL007", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": ["JOB008"]
+    },
+    {
+        "job_id": "JOB010",
+        "description": "Replace Sealant on Valve F",
+        "equipment_id": "EQUIP006",
+        "duration": 2,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [
+            {"material_id": "MAT007", "quantity": 5}
+        ],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB011",
+        "description": "Calibrate Sensors on Generator G",
+        "equipment_id": "EQUIP007",
+        "duration": 4,
+        "required_skills": ["instrumentation"],
+        "required_tools": [
+            {"tool_id": "TOOL004", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB012",
+        "description": "Electrical Inspection on Generator G",
+        "equipment_id": "EQUIP007",
+        "duration": 3,
+        "required_skills": ["electrical"],
+        "required_tools": [
+            {"tool_id": "TOOL002", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": ["JOB011"]
+    },
+    {
+        "job_id": "JOB013",
+        "description": "Clean Cooling Tower H",
+        "equipment_id": "EQUIP008",
+        "duration": 5,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 2}
+        ],
+        "required_materials": [
+            {"material_id": "MAT001", "quantity": 15}
+        ],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB014",
+        "description": "Inspect Pipes on Cooling Tower H",
+        "equipment_id": "EQUIP008",
+        "duration": 3,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": ["JOB013"]
+    },
+    {
+        "job_id": "JOB015",
+        "description": "Test Electrical Systems on Heat Exchanger D",
+        "equipment_id": "EQUIP004",
+        "duration": 4,
+        "required_skills": ["electrical"],
+        "required_tools": [
+            {"tool_id": "TOOL002", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": []
+    },
+    {
+        "job_id": "JOB016",
+        "description": "Perform Pressure Test on Valve F",
+        "equipment_id": "EQUIP006",
+        "duration": 2,
+        "required_skills": ["pneumatics"],
+        "required_tools": [
+            {"tool_id": "TOOL006", "quantity": 1}
+        ],
+        "required_materials": [],
+        "precedence": ["JOB010"]
+    },
+    {
+        "job_id": "JOB017",
+        "description": "Update Control Software on Boiler E",
+        "equipment_id": "EQUIP005",
+        "duration": 3,
+        "required_skills": ["automation"],
+        "required_tools": [],
+        "required_materials": [],
+        "precedence": ["JOB009"]
+    },
+    {
+        "job_id": "JOB018",
+        "description": "Check Cooling System on Compressor A",
+        "equipment_id": "EQUIP001",
+        "duration": 2,
+        "required_skills": ["mechanical"],
+        "required_tools": [
+            {"tool_id": "TOOL001", "quantity": 1}
+        ],
+        "required_materials": [
+            {"material_id": "MAT005", "quantity": 10}
+        ],
+        "precedence": ["JOB002"]
+    }
+]

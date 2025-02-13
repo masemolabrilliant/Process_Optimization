@@ -1,0 +1,37 @@
+[
+    {
+        "material_id": "MAT001",
+        "name": "Lubricant Oil",
+        "quantity": 200
+    },
+    {
+        "material_id": "MAT002",
+        "name": "Replacement Gaskets",
+        "quantity": 50
+    },
+    {
+        "material_id": "MAT003",
+        "name": "Welding Rods",
+        "quantity": 300
+    },
+    {
+        "material_id": "MAT004",
+        "name": "Insulation Tape",
+        "quantity": 100
+    },
+    {
+        "material_id": "MAT005",
+        "name": "Coolant",
+        "quantity": 150
+    },
+    {
+        "material_id": "MAT006",
+        "name": "Filters",
+        "quantity": 80
+    },
+    {
+        "material_id": "MAT007",
+        "name": "Sealant",
+        "quantity": 60
+    }
+]
