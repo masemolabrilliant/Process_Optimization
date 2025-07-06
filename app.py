@@ -95,26 +95,35 @@ def run_scheduler():
 def index():
     return render_template('index.html')
 
-# ----------------------------
-# Tool Management Routes
-# ----------------------------
 
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Equipments Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+@app.route('/equipments')
+def view_equipments():
+    return render_template("equipments.html")
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Job Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+
+# Tools form
 class ToolRequirementForm(FlaskForm):
     tool_id = SelectField('Tool', validators=[DataRequired()])
     quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
-    
-# ----------------------------
-# Materials Management Routes
-# ----------------------------
 
+
+# materials form
 class MaterialRequirementForm(FlaskForm):
     material_id = SelectField('Material', validators=[DataRequired()])
     quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
-
-
-# ----------------------
-# Job Management Routes
-# ----------------------
 
 class JobForm(FlaskForm):
     job_id = StringField('Job ID', validators=[DataRequired()])
@@ -248,9 +257,11 @@ def upload_jobs():
             flash('Invalid file format. Please upload a JSON file.', 'danger')
     return render_template('upload_jobs.html')
 
-# ----------------------------
+
+
+# -------------------------------------------------------------------------------------------------------------------------
 # Technician Management Routes
-# ----------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 
 class TechnicianForm(FlaskForm):
     tech_id = StringField('Technician ID', validators=[DataRequired()])
@@ -334,9 +345,42 @@ def delete_technician(tech_id):
     flash('Technician deleted successfully!', 'success')
     return redirect(url_for('view_technicians'))
 
-# ------------------------
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Skills Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+@app.route('/skills')
+def view_skills():
+    return render_template("skills.html")
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Tool Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+
+@app.route('/tools')
+def view_tools():
+    return render_template("skills.html")
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Materials Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+
+@app.route('/materials')
+def view_materials():
+    return render_template("materials.html")
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------
 # Schedule Display Route
-# ------------------------
+# -------------------------------------------------------------------------------------------------------------------------
+
 
 def split_job_into_working_hours(job, workday_start_time, workday_end_time, workdays):
     segments = []
@@ -532,9 +576,9 @@ def view_schedule():
 def gantt_chart_image():
     return send_from_directory('static/images', 'gantt_chart.png')
 
-# ------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 # Optimization Controls Route
-# ------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 
 class MILPOptimizationForm(FlaskForm):
     time_limit = IntegerField('Time Limit (seconds)', validators=[DataRequired(), NumberRange(min=1)])
@@ -735,9 +779,9 @@ def calculate_makespan(schedule):
 
     return max(end_times) - min(start_times)
 
-# -----------------------
+# -------------------------------------------------------------------------------------------------------------------------
 # Metrics Reports Route
-# -----------------------
+# -------------------------------------------------------------------------------------------------------------------------
 
 @app.route('/metrics')
 def view_metrics():
@@ -770,9 +814,9 @@ def view_metrics():
 def visualization_image(filename):
     return send_from_directory('static/images', filename)
 
-# ---------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 # Comparison Reports
-# ---------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 
 # Helper functions
 def calculate_schedule_metrics(schedule):
@@ -892,9 +936,9 @@ def compare_optimizers():
     comparison = compare_multiple_schedules(schedules)
     return render_template('compare_optimizers.html', comparison=comparison, optimizers=['Initial'] + optimizers)
 
-# ---------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 # Run the Flask Application
-# ---------------------------
+# -------------------------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
     app.run(debug=True)
