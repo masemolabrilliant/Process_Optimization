@@ -96,16 +96,13 @@ def index():
     return render_template('index.html')
 
 
-
-
-
 # -------------------------------------------------------------------------------------------------------------------------
 # Equipments Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
 
 @app.route('/equipments')
 def view_equipments():
-    return render_template("equipments.html")
+    return render_template("equipments/equipments.html")
 
 
 
@@ -140,7 +137,7 @@ class JobForm(FlaskForm):
 @app.route('/jobs')
 def view_jobs():
     jobs = load_data(JOBS_FILE)
-    return render_template('jobs.html', jobs=jobs)
+    return render_template('jobs/jobs.html', jobs=jobs)
 
 # add jobs route
 @app.route('/jobs/add', methods=['GET', 'POST'])
@@ -157,7 +154,7 @@ def add_job():
                 required_tools.append({'tool_id': tool_id.strip(), 'quantity': int(qty.strip())})
             except ValueError:
                 flash(f'Invalid tool format: "{tool}". Use tool_id:quantity.', 'danger')
-                return render_template('add_job.html', form=form)
+                return render_template('jobs/add_job.html', form=form)
         
         required_materials = []
         materials_input = form.required_materials.data.split(',')
@@ -167,7 +164,7 @@ def add_job():
                 required_materials.append({'material_id': mat_id.strip(), 'quantity': float(qty.strip())})
             except ValueError:
                 flash(f'Invalid material format: "{mat}". Use material_id:quantity.', 'danger')
-                return render_template('add_job.html', form=form)
+                return render_template('jobs/add_job.html', form=form)
         
         new_job = {
             'job_id': form.job_id.data,
@@ -183,7 +180,7 @@ def add_job():
         save_data(jobs, JOBS_FILE)
         flash('Job added successfully!', 'success')
         return redirect(url_for('view_jobs'))
-    return render_template('add_job.html', form=form)
+    return render_template('jobs/add_job.html', form=form)
 
 # edit jobs route
 @app.route('/jobs/edit/<job_id>', methods=['GET', 'POST'])
@@ -204,7 +201,7 @@ def edit_job(job_id):
                 required_tools.append({'tool_id': tool_id.strip(), 'quantity': int(qty.strip())})
             except ValueError:
                 flash(f'Invalid tool format: "{tool}". Use tool_id:quantity.', 'danger')
-                return render_template('edit_job.html', form=form, job_id=job_id)
+                return render_template('jobs/edit_job.html', form=form, job_id=job_id)
         
         required_materials = []
         materials_input = form.required_materials.data.split(',')
@@ -232,7 +229,7 @@ def edit_job(job_id):
     # Pre-fill required_tools and required_materials as strings
     form.required_tools.data = ','.join([f"{tool['tool_id']}:{tool['quantity']}" for tool in job['required_tools']])
     form.required_materials.data = ','.join([f"{mat['material_id']}:{mat['quantity']}" for mat in job['required_materials']])
-    return render_template('edit_job.html', form=form, job_id=job_id)
+    return render_template('jobs/edit_job.html', form=form, job_id=job_id)
 
 # delete jobs route
 @app.route('/jobs/delete/<job_id>', methods=['POST'])
@@ -255,7 +252,7 @@ def upload_jobs():
             return redirect(url_for('view_jobs'))
         else:
             flash('Invalid file format. Please upload a JSON file.', 'danger')
-    return render_template('upload_jobs.html')
+    return render_template('jobs/upload_jobs.html')
 
 
 
@@ -276,7 +273,7 @@ class TechnicianForm(FlaskForm):
 @app.route('/technicians')
 def view_technicians():
     technicians = load_data(TECHNICIANS_FILE)
-    return render_template('technicians.html', technicians=technicians)
+    return render_template('technicians/technicians.html', technicians=technicians)
 
 @app.route('/technicians/add', methods=['GET', 'POST'])
 def add_technician():
@@ -288,7 +285,7 @@ def add_technician():
             workdays = [int(day.strip()) for day in form.workdays.data.split(',')]
         except ValueError:
             flash('Invalid workday format. Use comma-separated integers (0=Mon, 6=Sun).', 'danger')
-            return render_template('add_technician.html', form=form)
+            return render_template('technicians/add_technician.html', form=form)
         
         new_technician = {
             'tech_id': form.tech_id.data,
@@ -303,7 +300,7 @@ def add_technician():
         save_data(technicians, TECHNICIANS_FILE)
         flash('Technician added successfully!', 'success')
         return redirect(url_for('view_technicians'))
-    return render_template('add_technician.html', form=form)
+    return render_template('technicians/add_technician.html', form=form)
 
 @app.route('/technicians/edit/<tech_id>', methods=['GET', 'POST'])
 def edit_technician(tech_id):
@@ -319,7 +316,7 @@ def edit_technician(tech_id):
             workdays = [int(day.strip()) for day in form.workdays.data.split(',')]
         except ValueError:
             flash('Invalid workday format. Use comma-separated integers (0=Mon, 6=Sun).', 'danger')
-            return render_template('edit_technician.html', form=form, tech_id=tech_id)
+            return render_template('technicians/edit_technician.html', form=form, tech_id=tech_id)
         
         technician.update({
             'tech_id': form.tech_id.data,
@@ -335,7 +332,7 @@ def edit_technician(tech_id):
         return redirect(url_for('view_technicians'))
     # Pre-fill workdays, workday_start, workday_end as strings
     form.workdays.data = ','.join([str(day) for day in technician['workdays']])
-    return render_template('edit_technician.html', form=form, tech_id=tech_id)
+    return render_template('technicians/edit_technician.html', form=form, tech_id=tech_id)
 
 @app.route('/technicians/delete/<tech_id>', methods=['POST'])
 def delete_technician(tech_id):
@@ -352,8 +349,7 @@ def delete_technician(tech_id):
 
 @app.route('/skills')
 def view_skills():
-    return render_template("skills.html")
-
+    return render_template("skills/skills.html")
 
 
 # -------------------------------------------------------------------------------------------------------------------------
@@ -363,7 +359,7 @@ def view_skills():
 
 @app.route('/tools')
 def view_tools():
-    return render_template("skills.html")
+    return render_template("tools/tools.html")
 
 # -------------------------------------------------------------------------------------------------------------------------
 # Materials Management Routes
@@ -372,9 +368,7 @@ def view_tools():
 
 @app.route('/materials')
 def view_materials():
-    return render_template("materials.html")
-
-
+    return render_template("materials/materials.html")
 
 
 # -------------------------------------------------------------------------------------------------------------------------
