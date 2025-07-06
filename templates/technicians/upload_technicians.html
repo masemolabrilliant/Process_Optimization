@@ -1,12 +1,21 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Upload Jobs CSV File</h1>
-<form method="post" enctype="multipart/form-data">
-    <div class="form-group">
-        <label for="file">Select CSV File:</label>
-        <input type="file" name="file" accept=".csv" class="form-control-file">
-    </div>
-    <button type="submit" class="btn btn-primary">Upload</button>
-</form>
+
+<div class="container mt-4">
+    <h1>Import Technicians from CSV</h1>
+
+    <form method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label>CSV File</label>
+            <input type="file" name="file" class="form-control-file" accept=".csv" required>
+            <small class="form-text text-muted">
+                Required CSV format: tech_id, name, skills (comma-separated), hourly_rate<br>
+                Example: TECH001,John Doe,"welding,electrical",45.50
+            </small>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+</div>
 {% endblock %}

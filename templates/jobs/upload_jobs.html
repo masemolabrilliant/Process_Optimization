@@ -1,12 +1,27 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Upload Jobs CSV File</h1>
-<form method="post" enctype="multipart/form-data">
-    <div class="form-group">
-        <label for="file">Select CSV File:</label>
-        <input type="file" name="file" accept=".csv" class="form-control-file">
-    </div>
-    <button type="submit" class="btn btn-primary">Upload</button>
-</form>
+
+<div class="container mt-4">
+    <h1>Import Jobs From CSV File</h1> 
+
+    <form method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label>Equipment</label>
+            <select name="equipment_id" class="form-control" required>
+                {% for id, name in equipment %}
+                <option value="{{ id }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>CSV File</label>
+            <input type="file" name="file" class="form-control-file" accept=".csv" required>
+            <small class="form-text text-muted">required columns: job_id, description, duration, required_skills, required_tools, required_materials, precedence </small>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+</div>
 {% endblock %}

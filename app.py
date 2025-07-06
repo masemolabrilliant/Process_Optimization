@@ -1,17 +1,22 @@
 # app.py
 
-from flask import Flask, Response, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
+from flask import Flask, Response, render_template, request, redirect, url_for, flash, send_from_directory, current_app 
 from flask_wtf import FlaskForm
 from wtforms import StringField, IntegerField, SelectField, SelectMultipleField, FieldList, FormField, SubmitField, FloatField, TextAreaField
 from wtforms.validators import DataRequired, NumberRange
 from werkzeug.utils import secure_filename
-
 import plotly
 import plotly.figure_factory as ff
-import json
 import os
 import datetime
 import time
+
+from sqlalchemy.orm import joinedload, subqueryload 
+from io import TextIOWrapper
+from flask_migrate import Migrate
+from sqlalchemy import text
+import csv
+import io
 
 # Import scheduler and metrics functions
 from src.scheduler import Scheduler
@@ -30,29 +35,136 @@ from src.metrics import (
     calculate_equipment_idle_times,
     generate_visualizations
 )
+# database configurations
+from flask_sqlalchemy import SQLAlchemy
+from config import (
+    SQLALCHEMY_DATABASE_URI,
+    SQLALCHEMY_TRACK_MODIFICATIONS,
+    UPLOAD_FOLDER
+)
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'secret_key'  # To replace with secure key in production
 
-# Data paths
-DATA_DIR = 'data'
-JOBS_FILE = os.path.join(DATA_DIR, 'jobs.json')
-TECHNICIANS_FILE = os.path.join(DATA_DIR, 'technicians.json')
-TOOLS_FILE = os.path.join(DATA_DIR, 'tools.json')
-MATERIALS_FILE = os.path.join(DATA_DIR, 'materials.json')
-EQUIPMENT_FILE = os.path.join(DATA_DIR, 'equipment.json')
-SCHEDULE_FILE = os.path.join(DATA_DIR, 'schedule.json')
-METRICS_FILE = os.path.join(DATA_DIR, 'metrics.json')
+# Load configuration from config.py
+app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
 
-# Helper functions to load and save data
-def load_data(file_path):
-    with open(file_path, 'r') as f:
-        return json.load(f)
+# Ensure the upload folder exists and configure it
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = str(UPLOAD_FOLDER)
 
-def save_data(data, file_path):
-    with open(file_path, 'w') as f:
-        json.dump(data, f, indent=4, default=str)
+# Initialize SQLAlchemy
+db = SQLAlchemy(app)
+migrate = Migrate(app, db) 
+# -------------------------------------------------------------------------------------------------------------------------
+#  Models for jobs
+# -------------------------------------------------------------------------------------------------------------------------
+class Job(db.Model):
+    __tablename__ = 'jobs'
+    
+    job_id = db.Column(db.String(10), primary_key=True)
+    description = db.Column(db.Text, nullable=False)
+    duration = db.Column(db.Integer, nullable=False)
+    equipment_id = db.Column(db.String(10), db.ForeignKey('equipment.equipment_id'), nullable=False)
+    
+    # Relationships
+    equipment = db.relationship('Equipment', backref='jobs')
+    skills = db.relationship('JobSkill', backref='job', cascade='all, delete-orphan')
+    tools = db.relationship('JobTool', backref='job', cascade='all, delete-orphan')
+    materials = db.relationship('JobMaterial', backref='job', cascade='all, delete-orphan')
+    
+    # Updated with cascade rules (critical change)
+    precedes = db.relationship('JobPrecedence',
+                             foreign_keys='JobPrecedence.job_id',
+                             backref='job',
+                             cascade='all, delete-orphan',
+                             passive_deletes=True)
+    
+    preceded_by = db.relationship('JobPrecedence',
+                                foreign_keys='JobPrecedence.precedes_job_id',
+                                backref='precedes_job',
+                                cascade='all, delete-orphan',
+                                passive_deletes=True)
+class JobSkill(db.Model):
+    __tablename__ = 'jobs_skills'
+    
+    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
+    skill = db.Column(db.String(50), primary_key=True)
+
+class JobTool(db.Model):
+    __tablename__ = 'jobs_tools'
+    
+    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
+    tool_id = db.Column(db.String(10), primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False)
+
+class JobMaterial(db.Model):
+    __tablename__ = 'jobs_materials'
+    
+    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
+    material_id = db.Column(db.String(10), primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False)
+
+class JobPrecedence(db.Model):
+    __tablename__ = 'jobs_precedence'
+    
+    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
+    precedes_job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
+
+# Reference tables (must exist for validation)
+class Equipment(db.Model):
+    __tablename__ = 'equipment'
+    equipment_id = db.Column(db.String(10), primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    priority = db.Column(db.Integer)
+
+class Skill(db.Model):
+    __tablename__ = 'skills'
+    skill = db.Column(db.String(50), primary_key=True)
+
+class Tool(db.Model):
+    __tablename__ = 'tools'
+    tool_id = db.Column(db.String(10), primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.Integer)
+
+class Material(db.Model):
+    __tablename__ = 'materials'
+    material_id = db.Column(db.String(10), primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.Integer)
+
+
+    #/////////////////////
+class Technician(db.Model):
+    __tablename__ = 'technicians'
+    
+    tech_id = db.Column(db.String(10), primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # Only name from JSON
+    
+    # Relationships
+    skills = db.relationship('TechnicianSkill', 
+                           backref='technician',
+                           cascade='all, delete-orphan')  # Auto-delete skills
+    hourly_rate = db.Column(db.Float) 
+
+class TechnicianSkill(db.Model):
+    __tablename__ = 'technician_skills'
+    
+    tech_id = db.Column(db.String(10), 
+                      db.ForeignKey('technicians.tech_id', ondelete='CASCADE'),
+                      primary_key=True)
+    skill = db.Column(db.String(50), primary_key=True)  # Skills stored as strings
+
+    #///////////////////
+
+# Create all tables
+with app.app_context():
+    db.create_all()
+
+
 
 # Function to run the scheduler and generate schedule and metrics
 def run_scheduler():
@@ -102,8 +214,8 @@ def index():
 
 @app.route('/equipments')
 def view_equipments():
-    return render_template("equipments/equipments.html")
-
+    equipments = Equipment.query.order_by(Equipment.equipment_id).all() 
+    return render_template("equipments/equipments.html", equipments=equipments)
 
 
 # -------------------------------------------------------------------------------------------------------------------------
@@ -136,8 +248,27 @@ class JobForm(FlaskForm):
 # view jobs route
 @app.route('/jobs')
 def view_jobs():
-    jobs = load_data(JOBS_FILE)
-    return render_template('jobs/jobs.html', jobs=jobs)
+ # Query jobs with all related data
+    jobs = Job.query.options(
+        joinedload(Job.equipment),
+        subqueryload(Job.skills),
+        subqueryload(Job.precedes)
+    ).order_by(Job.job_id).all()
+
+    # Format the data for display
+    formatted_jobs = []
+    for job in jobs:
+        formatted_jobs.append({
+            'job_id': job.job_id,
+            'description': job.description,
+            'duration': job.duration,
+            'equipment_id': job.equipment.equipment_id,
+            'required_skills': ', '.join([skill.skill for skill in job.skills]),
+            'precedence': ', '.join([p.precedes_job_id for p in job.precedes])
+        })
+    
+    return render_template('jobs/jobs.html', jobs=formatted_jobs)
+
 
 # add jobs route
 @app.route('/jobs/add', methods=['GET', 'POST'])
@@ -229,30 +360,195 @@ def edit_job(job_id):
     # Pre-fill required_tools and required_materials as strings
     form.required_tools.data = ','.join([f"{tool['tool_id']}:{tool['quantity']}" for tool in job['required_tools']])
     form.required_materials.data = ','.join([f"{mat['material_id']}:{mat['quantity']}" for mat in job['required_materials']])
+
     return render_template('jobs/edit_job.html', form=form, job_id=job_id)
 
 # delete jobs route
 @app.route('/jobs/delete/<job_id>', methods=['POST'])
 def delete_job(job_id):
-    jobs = load_data(JOBS_FILE)
-    jobs = [job for job in jobs if job['job_id'] != job_id]
-    save_data(jobs, JOBS_FILE)
-    flash('Job deleted successfully!', 'success')
+    try:
+        job = Job.query.get_or_404(job_id)
+        db.session.delete(job)
+        db.session.commit()
+        flash('Job deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting job: {str(e)}', 'danger')
+        current_app.logger.error(f"Failed to delete job {job_id}: {str(e)}")  # Now works
+    
     return redirect(url_for('view_jobs'))
 
 # upload jobs route
 @app.route('/jobs/upload', methods=['GET', 'POST'])
 def upload_jobs():
+    equipment = db.session.execute(text("SELECT equipment_id, name FROM equipment")).fetchall()
+    
     if request.method == 'POST':
-        file = request.files['file']
-        if file and file.filename.endswith('.json'):
-            filename = secure_filename('jobs.json')
-            file.save(os.path.join(DATA_DIR, filename))
-            flash('Jobs uploaded successfully!', 'success')
-            return redirect(url_for('view_jobs'))
-        else:
-            flash('Invalid file format. Please upload a JSON file.', 'danger')
-    return render_template('jobs/upload_jobs.html')
+        if not (file := request.files.get('file')):
+            flash('No file selected', 'error')
+            return redirect(url_for('upload_jobs'))
+        
+        if not file.filename.endswith('.csv'):
+            flash('Only CSV files allowed', 'error')
+            return redirect(url_for('upload_jobs'))
+        
+        try:
+            equipment_id = request.form['equipment_id']
+            
+            # Validate equipment exists
+            if not db.session.execute(text(
+                "SELECT 1 FROM equipment WHERE equipment_id = :equipment_id"),
+                {'equipment_id': equipment_id}
+            ).fetchone():
+                flash('Invalid equipment selected!', 'danger')
+                return redirect(url_for('upload_jobs'))
+
+            file.stream.seek(0)  # Rewind the file pointer
+            csv_data = file.stream.read().decode('utf-8')
+            csv_file = io.StringIO(csv_data)
+            reader = csv.DictReader(csv_file)
+            valid_rows = []
+            errors = []
+            
+            for row_num, row in enumerate(reader, 1):
+                row_errors = []
+                
+                # Validate required fields
+                if not all(key in row for key in ['job_id', 'description', 'duration']):
+                    row_errors.append("Missing required fields")
+                    errors.append(f"Row {row_num}: Missing required fields")
+                    continue
+                
+                # Validate skills
+                skills = [s.strip() for s in row.get('required_skills', '').split(',') if s.strip()]
+                for skill in skills:
+                    if not db.session.execute(text(
+                        "SELECT 1 FROM skills WHERE skill = :skill"),
+                        {'skill': skill}
+                    ).fetchone():
+                        row_errors.append(f"Invalid skill: {skill}")
+                
+                # Validate tools
+                tools = []
+                tool_entries = [t.strip() for t in row.get('required_tools', '').split(',') if t.strip()]
+                for tool_entry in tool_entries:
+                    try:
+                        tool_id, quantity = tool_entry.split(':')
+                        if not db.session.execute(text(
+                            "SELECT 1 FROM tools WHERE tool_id = :tool_id"),
+                            {'tool_id': tool_id}
+                        ).fetchone():
+                            row_errors.append(f"Invalid tool ID: {tool_id}")
+                        else:
+                            tools.append((tool_id, int(quantity)))
+                    except ValueError:
+                        row_errors.append(f"Invalid tool format: {tool_entry}")
+                
+                # Validate materials
+                materials = []
+                material_entries = [m.strip() for m in row.get('required_materials', '').split(',') if m.strip()]
+                for material_entry in material_entries:
+                    try:
+                        material_id, quantity = material_entry.split(':')
+                        if not db.session.execute(text(
+                            "SELECT 1 FROM materials WHERE material_id = :material_id"),
+                            {'material_id': material_id}
+                        ).fetchone():
+                            row_errors.append(f"Invalid material ID: {material_id}")
+                        else:
+                            materials.append((material_id, int(quantity)))
+                    except ValueError:
+                        row_errors.append(f"Invalid material format: {material_entry}")
+                
+                # Validate precedence jobs
+                precedence_jobs = [p.strip() for p in row.get('precedence', '').split(',') if p.strip()]
+                for job_id in precedence_jobs:
+                    if not db.session.execute(text(
+                        "SELECT 1 FROM jobs WHERE job_id = :job_id"),
+                        {'job_id': job_id}
+                    ).fetchone():
+                        row_errors.append(f"Invalid precedence job ID: {job_id}")
+                
+                if row_errors:
+                    errors.append(f"Row {row_num} errors: {'; '.join(row_errors)}")
+                else:
+                    valid_rows.append((row, skills, tools, materials, precedence_jobs))
+            
+            if errors:
+                flash('Errors found in CSV: ' + ' | '.join(errors[:3]) + ('...' if len(errors) > 3 else ''), 'danger')
+            skipped_jobs = 0
+            if valid_rows:
+                for row, skills, tools, materials, precedence_jobs in valid_rows:
+                    
+                     # Skip if job already exists
+                    if db.session.execute(
+                        text("SELECT 1 FROM jobs WHERE job_id = :job_id"),
+                        {'job_id': row['job_id']}
+                    ).fetchone():
+                        skipped_jobs += 1
+                        continue  # Skip to next row
+
+                    if 'equipment_id' in row:
+                        # Remove or ignore the CSV's equipment_id
+                        del row['equipment_id']
+                    
+                    # Insert job
+                    db.session.execute(text(
+                        """INSERT INTO jobs (job_id, description, equipment_id, duration)
+                        VALUES (:job_id, :description, :equipment_id, :duration)"""),
+                        {
+                            'job_id': row['job_id'],
+                            'description': row['description'],
+                            'equipment_id': equipment_id,
+                            'duration': int(row['duration'])
+                        }
+                    )
+                    
+                    # Insert skills
+                    for skill in skills:
+                        db.session.execute(text(
+                            """INSERT INTO jobs_skills (job_id, skill)
+                            VALUES (:job_id, :skill)"""),
+                            {'job_id': row['job_id'], 'skill': skill}
+                        )
+                    
+                    # Insert tools
+                    for tool_id, quantity in tools:
+                        db.session.execute( text(
+                            """INSERT INTO jobs_tools (job_id, tool_id, quantity)
+                            VALUES (:job_id, :tool_id, :quantity)"""),
+                            {'job_id': row['job_id'], 'tool_id': tool_id, 'quantity': quantity}
+                        )
+                    
+                    # Insert materials
+                    for material_id, quantity in materials:
+                        db.session.execute(text(
+                            """INSERT INTO jobs_materials (job_id, material_id, quantity)
+                            VALUES (:job_id, :material_id, :quantity)"""),
+                            {'job_id': row['job_id'], 'material_id': material_id, 'quantity': quantity}
+                        )
+                    
+                    # Insert precedence
+                    for precedes_job_id in precedence_jobs:
+                        db.session.execute(text(
+                            """INSERT INTO jobs_precedence (job_id, precedes_job_id)
+                            VALUES (:job_id, :precedes_job_id)"""),
+                            {'job_id': row['job_id'], 'precedes_job_id': precedes_job_id}
+                        )
+                
+                db.session.commit()
+                flash(f'Successfully imported {len(valid_rows)-skipped_jobs} new jobs (skipped {skipped_jobs} duplicates)', 'success')
+                #flash(f'Successfully imported {len(valid_rows)} job(s)!', 'success')
+                return redirect(url_for('view_jobs'))
+            
+            return redirect(url_for('upload_jobs'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Import failed: {str(e)}', 'error')
+            return redirect(url_for('upload_jobs'))
+    
+    return render_template('jobs/upload_jobs.html', equipment=equipment)
 
 
 
@@ -272,8 +568,30 @@ class TechnicianForm(FlaskForm):
 
 @app.route('/technicians')
 def view_technicians():
-    technicians = load_data(TECHNICIANS_FILE)
-    return render_template('technicians/technicians.html', technicians=technicians)
+    # Query technicians with their skills
+    technicians = Technician.query.options(
+        subqueryload(Technician.skills)
+    ).order_by(Technician.tech_id).all()
+    
+    # Pre-process the data for the template
+    processed_techs = []
+    for tech in technicians:
+        # Format skills as comma-separated string
+        skills_str = ', '.join([skill.skill for skill in tech.skills]) if tech.skills else 'No skills'
+        
+        # Format hourly rate with 2 decimal places
+        hourly_rate_str = f"{tech.hourly_rate:.2f}"
+        
+        processed_techs.append({
+            'tech_id': tech.tech_id,
+            'name': tech.name,
+            'skills': skills_str,
+            'hourly_rate': hourly_rate_str,
+            'raw': tech  # Keep original object if needed for actions
+        })
+    
+    return render_template('technicians/technicians.html', technicians=processed_techs)
+
 
 @app.route('/technicians/add', methods=['GET', 'POST'])
 def add_technician():
@@ -301,6 +619,12 @@ def add_technician():
         flash('Technician added successfully!', 'success')
         return redirect(url_for('view_technicians'))
     return render_template('technicians/add_technician.html', form=form)
+
+
+
+
+
+
 
 @app.route('/technicians/edit/<tech_id>', methods=['GET', 'POST'])
 def edit_technician(tech_id):
@@ -343,14 +667,110 @@ def delete_technician(tech_id):
     return redirect(url_for('view_technicians'))
 
 
+
+@app.route('/upload_technicians', methods=['GET', 'POST'])
+def upload_technicians():
+    if request.method == 'POST':
+        if not (file := request.files.get('file')):
+            flash('No file selected', 'error')
+            return redirect(url_for('upload_technicians'))
+            
+        if not file.filename.endswith('.csv'):
+            flash('Only CSV files allowed', 'error')
+            return redirect(url_for('upload_technicians'))
+
+        try:
+            file.stream.seek(0)
+            csv_data = file.stream.read().decode('utf-8')
+            csv_file = io.StringIO(csv_data)
+            reader = csv.DictReader(csv_file)
+            
+            # Track results
+            counts = {
+                'added': 0,
+                'duplicates': 0,
+                'invalid_data': 0,
+                'missing_skills': 0
+            }
+
+            with db.session.begin():
+                existing_tech = {t.tech_id for t in Technician.query.with_entities(Technician.tech_id)}
+                existing_skills = {s.skill for s in Skill.query.with_entities(Skill.skill)}
+                
+                for row in reader:
+                    tech_id = (row.get('tech_id') or '').strip()
+                    name = (row.get('name') or '').strip()
+                    skills_str = (row.get('skills') or '').strip()
+                    hourly_rate_str = (row.get('hourly_rate') or '').strip()
+                    
+                    # Validate required fields
+                    if not all([tech_id, name, skills_str, hourly_rate_str]):
+                        counts['invalid_data'] += 1
+                        continue
+                        
+                    # Check duplicate
+                    if tech_id in existing_tech:
+                        counts['duplicates'] += 1
+                        continue
+                        
+                    # Validate skills
+                    skills = [s.strip() for s in skills_str.split(',') if s.strip()]
+                    if not skills or any(s not in existing_skills for s in skills):
+                        counts['missing_skills'] += 1
+                        continue
+                        
+                    # Validate hourly rate
+                    try:
+                        hourly_rate = float(hourly_rate_str)
+                        if hourly_rate <= 0:
+                            raise ValueError
+                    except ValueError:
+                        counts['invalid_data'] += 1
+                        continue
+                        
+                    # Add technician
+                    technician = Technician(
+                        tech_id=tech_id,
+                        name=name,
+                        hourly_rate=hourly_rate
+                    )
+                    db.session.add(technician)
+                    
+                    # Add skills
+                    for skill in skills:
+                        db.session.add(TechnicianSkill(
+                            tech_id=tech_id,
+                            skill=skill
+                        ))
+                    
+                    counts['added'] += 1
+                    existing_tech.add(tech_id)  # Update cache
+
+            # Generate concise flash message
+            message = (
+                f"You have successfully Added: {counts['added']} | "
+                f"Duplicates: {counts['duplicates']} | "
+                f"Invalid data: {counts['invalid_data']} | "
+                f"Missing skills: {counts['missing_skills']}"
+            )
+            
+            flash(message, 'info' if counts['added'] else 'warning')
+            return redirect(url_for('view_technicians'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Import failed: {str(e)}', 'error')
+            return redirect(url_for('upload_technicians'))
+    
+    return render_template('technicians/upload_technicians.html')
 # -------------------------------------------------------------------------------------------------------------------------
 # Skills Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
 
 @app.route('/skills')
 def view_skills():
-    return render_template("skills/skills.html")
-
+    skills = Skill.query.all()  
+    return render_template('skills/skills.html', skills=skills)
 
 # -------------------------------------------------------------------------------------------------------------------------
 # Tool Management Routes
@@ -359,7 +779,8 @@ def view_skills():
 
 @app.route('/tools')
 def view_tools():
-    return render_template("tools/tools.html")
+    tools = Tool.query.order_by(Tool.tool_id).all()  # Gets all tools sorted by ID
+    return render_template("tools/tools.html", tools=tools)
 
 # -------------------------------------------------------------------------------------------------------------------------
 # Materials Management Routes
@@ -368,7 +789,8 @@ def view_tools():
 
 @app.route('/materials')
 def view_materials():
-    return render_template("materials/materials.html")
+    materials_list = Material.query.order_by(Material.material_id).all() 
+    return render_template("materials/materials.html", materials=materials_list)
 
 
 # -------------------------------------------------------------------------------------------------------------------------

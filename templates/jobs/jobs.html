@@ -5,7 +5,7 @@
     
     <div class="mb-3">
         <a href="{{ url_for('add_job') }}" class="btn btn-primary">Add New Job</a>
-        <a href="{{ url_for('upload_jobs') }}" class="btn btn-secondary">Upload Jobs CSV</a>
+        <a href="{{ url_for('upload_jobs') }}" class="btn btn-secondary">Import CSV File</a> 
     </div>
 
     <div class="table-responsive">
@@ -28,8 +28,8 @@
                     <td>{{ job.description }}</td>
                     <td>{{ job.duration }}</td>
                     <td>{{ job.equipment_id }}</td>
-                    <td>{{ ', '.join(job.required_skills) }}</td>
-                    <td>{{ ', '.join(job.precedence) }}</td>
+                    <td>{{ job.required_skills }}</td>
+                    <td>{{ job.precedence }}</td>
                     <td>
                         <a href="{{ url_for('edit_job', job_id=job.job_id) }}" class="btn btn-warning btn-sm">Edit</a>
                         <form action="{{ url_for('delete_job', job_id=job.job_id) }}" method="post" style="display:inline;">

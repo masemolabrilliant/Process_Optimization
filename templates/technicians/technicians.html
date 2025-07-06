@@ -1,3 +1,6 @@
+
+
+
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
@@ -5,7 +8,7 @@
     
     <div class="mb-3">
         <a href="{{ url_for('add_technician') }}" class="btn btn-primary">Add New Technician</a>
-        <a href="{{ url_for('upload_jobs') }}" class="btn btn-secondary">Upload Jobs CSV</a>
+        <a href="{{ url_for('upload_technicians') }}" class="btn btn-secondary">Import Technicians from CSV</a>
 
     </div>
 
@@ -25,8 +28,8 @@
                 <tr>
                     <td>{{ tech.tech_id }}</td>
                     <td>{{ tech.name }}</td>
-                    <td>{{ ', '.join(tech.skills) }}</td>
-                    <td>${{ tech.hourly_rate }}</td>
+                    <td>{{ tech.skills }}</td>
+                    <td>R{{ tech.hourly_rate }}</td>
                     <td>
                         <a href="{{ url_for('edit_technician', tech_id=tech.tech_id) }}" class="btn btn-warning btn-sm">Edit</a>
                         <form action="{{ url_for('delete_technician', tech_id=tech.tech_id) }}" method="post" style="display:inline;">
