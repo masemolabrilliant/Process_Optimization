@@ -9,8 +9,9 @@
         <div class="form-group">
             <label>Equipment</label>
             <select name="equipment_id" class="form-control" required>
-                {% for id, name in equipment %}
-                <option value="{{ id }}">{{ name }}</option>
+                <option value="default">Choose an equipment:</option>
+                {% for id,  name in equipment %}
+                <option value="{{ id }}">{{ id }} - {{ name }}</option>
                 {% endfor %}
             </select>
         </div>

@@ -1,22 +1,30 @@
 # app.py
 
-from flask import Flask, Response, render_template, request, redirect, url_for, flash, send_from_directory, current_app 
+from flask import (
+    Flask, Response, render_template, request, redirect, url_for, 
+    flash, jsonify, send_from_directory, current_app, session
+)
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, SelectField, SelectMultipleField, FieldList, FormField, SubmitField, FloatField, TextAreaField
+from wtforms import (
+    StringField, IntegerField, SelectField, SelectMultipleField, 
+    FieldList, FormField, SubmitField, FloatField, TextAreaField
+)
 from wtforms.validators import DataRequired, NumberRange
 from werkzeug.utils import secure_filename
+from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy import text
+from flask_migrate import Migrate
+from io import TextIOWrapper
+
 import plotly
 import plotly.figure_factory as ff
+import json
 import os
 import datetime
 import time
-
-from sqlalchemy.orm import joinedload, subqueryload 
-from io import TextIOWrapper
-from flask_migrate import Migrate
-from sqlalchemy import text
 import csv
 import io
+
 
 # Import scheduler and metrics functions
 from src.scheduler import Scheduler
@@ -35,6 +43,7 @@ from src.metrics import (
     calculate_equipment_idle_times,
     generate_visualizations
 )
+
 # database configurations
 from flask_sqlalchemy import SQLAlchemy
 from config import (
@@ -47,6 +56,7 @@ from config import (
 app = Flask(__name__)
 app.secret_key = 'secret_key'  # To replace with secure key in production
 
+
 # Load configuration from config.py
 app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
@@ -58,9 +68,12 @@ app.config['UPLOAD_FOLDER'] = str(UPLOAD_FOLDER)
 # Initialize SQLAlchemy
 db = SQLAlchemy(app)
 migrate = Migrate(app, db) 
+
 # -------------------------------------------------------------------------------------------------------------------------
 #  Models for jobs
 # -------------------------------------------------------------------------------------------------------------------------
+
+
 class Job(db.Model):
     __tablename__ = 'jobs'
     
@@ -87,6 +100,7 @@ class Job(db.Model):
                                 backref='precedes_job',
                                 cascade='all, delete-orphan',
                                 passive_deletes=True)
+
 class JobSkill(db.Model):
     __tablename__ = 'jobs_skills'
     
@@ -137,7 +151,6 @@ class Material(db.Model):
     quantity = db.Column(db.Integer)
 
 
-    #/////////////////////
 class Technician(db.Model):
     __tablename__ = 'technicians'
     
@@ -158,13 +171,35 @@ class TechnicianSkill(db.Model):
                       primary_key=True)
     skill = db.Column(db.String(50), primary_key=True)  # Skills stored as strings
 
-    #///////////////////
+   
 
 # Create all tables
 with app.app_context():
     db.create_all()
 
 
+
+
+######################End of models ###########################
+
+# Data paths
+DATA_DIR = 'data'
+JOBS_FILE = os.path.join(DATA_DIR, 'jobs.json')
+TECHNICIANS_FILE = os.path.join(DATA_DIR, 'technicians.json')
+TOOLS_FILE = os.path.join(DATA_DIR, 'tools.json')
+MATERIALS_FILE = os.path.join(DATA_DIR, 'materials.json')
+EQUIPMENT_FILE = os.path.join(DATA_DIR, 'equipment.json')
+SCHEDULE_FILE = os.path.join(DATA_DIR, 'schedule.json')
+METRICS_FILE = os.path.join(DATA_DIR, 'metrics.json')
+
+# Helper functions to load and save data
+def load_data(file_path):
+    with open(file_path, 'r') as f:
+        return json.load(f)
+
+def save_data(data, file_path):
+    with open(file_path, 'w') as f:
+        json.dump(data, f, indent=4, default=str)
 
 # Function to run the scheduler and generate schedule and metrics
 def run_scheduler():
@@ -207,32 +242,26 @@ def run_scheduler():
 def index():
     return render_template('index.html')
 
+# ----------------------------
+# Tool Management Routes
+# ----------------------------
 
-# -------------------------------------------------------------------------------------------------------------------------
-# Equipments Management Routes
-# -------------------------------------------------------------------------------------------------------------------------
+class ToolRequirementForm(FlaskForm):
+    tool_id = SelectField('Tool', validators=[DataRequired()])
+    quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
+    
+# ----------------------------
+# Materials Management Routes
+# ----------------------------
 
-@app.route('/equipments')
-def view_equipments():
-    equipments = Equipment.query.order_by(Equipment.equipment_id).all() 
-    return render_template("equipments/equipments.html", equipments=equipments)
+class MaterialRequirementForm(FlaskForm):
+    material_id = SelectField('Material', validators=[DataRequired()])
+    quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
 
 
 # -------------------------------------------------------------------------------------------------------------------------
 # Job Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
-
-
-# Tools form
-class ToolRequirementForm(FlaskForm):
-    tool_id = SelectField('Tool', validators=[DataRequired()])
-    quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
-
-
-# materials form
-class MaterialRequirementForm(FlaskForm):
-    material_id = SelectField('Material', validators=[DataRequired()])
-    quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
 
 class JobForm(FlaskForm):
     job_id = StringField('Job ID', validators=[DataRequired()])
@@ -268,7 +297,6 @@ def view_jobs():
         })
     
     return render_template('jobs/jobs.html', jobs=formatted_jobs)
-
 
 # add jobs route
 @app.route('/jobs/add', methods=['GET', 'POST'])
@@ -550,8 +578,6 @@ def upload_jobs():
     
     return render_template('jobs/upload_jobs.html', equipment=equipment)
 
-
-
 # -------------------------------------------------------------------------------------------------------------------------
 # Technician Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
@@ -566,6 +592,7 @@ class TechnicianForm(FlaskForm):
     workday_end = StringField('Workday End Time (HH:MM)', validators=[DataRequired()])
     submit = SubmitField('Submit')
 
+# view technicians route
 @app.route('/technicians')
 def view_technicians():
     # Query technicians with their skills
@@ -592,7 +619,7 @@ def view_technicians():
     
     return render_template('technicians/technicians.html', technicians=processed_techs)
 
-
+# add technicians route
 @app.route('/technicians/add', methods=['GET', 'POST'])
 def add_technician():
     form = TechnicianForm()
@@ -620,11 +647,14 @@ def add_technician():
         return redirect(url_for('view_technicians'))
     return render_template('technicians/add_technician.html', form=form)
 
-
-
-
-
-
+# delete technicians route
+@app.route('/technicians/delete/<tech_id>', methods=['POST'])
+def delete_technician(tech_id):
+    technicians = load_data(TECHNICIANS_FILE)
+    technicians = [tech for tech in technicians if tech['tech_id'] != tech_id]
+    save_data(technicians, TECHNICIANS_FILE)
+    flash('Technician deleted successfully!', 'success')
+    return redirect(url_for('view_technicians'))
 
 @app.route('/technicians/edit/<tech_id>', methods=['GET', 'POST'])
 def edit_technician(tech_id):
@@ -640,7 +670,7 @@ def edit_technician(tech_id):
             workdays = [int(day.strip()) for day in form.workdays.data.split(',')]
         except ValueError:
             flash('Invalid workday format. Use comma-separated integers (0=Mon, 6=Sun).', 'danger')
-            return render_template('technicians/edit_technician.html', form=form, tech_id=tech_id)
+            return render_template('edit_technician.html', form=form, tech_id=tech_id)
         
         technician.update({
             'tech_id': form.tech_id.data,
@@ -656,18 +686,9 @@ def edit_technician(tech_id):
         return redirect(url_for('view_technicians'))
     # Pre-fill workdays, workday_start, workday_end as strings
     form.workdays.data = ','.join([str(day) for day in technician['workdays']])
-    return render_template('technicians/edit_technician.html', form=form, tech_id=tech_id)
+    return render_template('edit_technician.html', form=form, tech_id=tech_id)
 
-@app.route('/technicians/delete/<tech_id>', methods=['POST'])
-def delete_technician(tech_id):
-    technicians = load_data(TECHNICIANS_FILE)
-    technicians = [tech for tech in technicians if tech['tech_id'] != tech_id]
-    save_data(technicians, TECHNICIANS_FILE)
-    flash('Technician deleted successfully!', 'success')
-    return redirect(url_for('view_technicians'))
-
-
-
+# upload technicians route
 @app.route('/upload_technicians', methods=['GET', 'POST'])
 def upload_technicians():
     if request.method == 'POST':
@@ -763,6 +784,17 @@ def upload_technicians():
             return redirect(url_for('upload_technicians'))
     
     return render_template('technicians/upload_technicians.html')
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Equipments Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+@app.route('/equipments')
+def view_equipments():
+    equipments = Equipment.query.order_by(Equipment.equipment_id).all() 
+    return render_template("equipments/equipments.html", equipments=equipments)
+
+
 # -------------------------------------------------------------------------------------------------------------------------
 # Skills Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
@@ -773,19 +805,18 @@ def view_skills():
     return render_template('skills/skills.html', skills=skills)
 
 # -------------------------------------------------------------------------------------------------------------------------
-# Tool Management Routes
+# Tools Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
-
 
 @app.route('/tools')
 def view_tools():
     tools = Tool.query.order_by(Tool.tool_id).all()  # Gets all tools sorted by ID
     return render_template("tools/tools.html", tools=tools)
 
+
 # -------------------------------------------------------------------------------------------------------------------------
 # Materials Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
-
 
 @app.route('/materials')
 def view_materials():
@@ -796,7 +827,6 @@ def view_materials():
 # -------------------------------------------------------------------------------------------------------------------------
 # Schedule Display Route
 # -------------------------------------------------------------------------------------------------------------------------
-
 
 def split_job_into_working_hours(job, workday_start_time, workday_end_time, workdays):
     segments = []
@@ -995,7 +1025,6 @@ def gantt_chart_image():
 # -------------------------------------------------------------------------------------------------------------------------
 # Optimization Controls Route
 # -------------------------------------------------------------------------------------------------------------------------
-
 class MILPOptimizationForm(FlaskForm):
     time_limit = IntegerField('Time Limit (seconds)', validators=[DataRequired(), NumberRange(min=1)])
     gap = FloatField('Optimality Gap', validators=[DataRequired(), NumberRange(min=0, max=1)])
@@ -1355,6 +1384,7 @@ def compare_optimizers():
 # -------------------------------------------------------------------------------------------------------------------------
 # Run the Flask Application
 # -------------------------------------------------------------------------------------------------------------------------
+
 
 if __name__ == '__main__':
     app.run(debug=True)
