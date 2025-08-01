@@ -1,0 +1,14 @@
+[
+    {
+        "job_id": "JOB001",
+        "reason": [
+            "Tool TOOL001 unavailable or insufficient"
+        ]
+    },
+    {
+        "job_id": "JOB016",
+        "reason": [
+            "No matching technicians with required skills"
+        ]
+    }
+]

@@ -155,13 +155,18 @@ class Technician(db.Model):
     __tablename__ = 'technicians'
     
     tech_id = db.Column(db.String(10), primary_key=True)
-    name = db.Column(db.String(100), nullable=False)  # Only name from JSON
+    name = db.Column(db.String(100), nullable=False)
     
+    phone_number = db.Column(db.String(20), nullable=True)  
+    email = db.Column(db.String(100), nullable=True)        
+
+    hourly_rate = db.Column(db.Float)
+
     # Relationships
     skills = db.relationship('TechnicianSkill', 
-                           backref='technician',
-                           cascade='all, delete-orphan')  # Auto-delete skills
-    hourly_rate = db.Column(db.Float) 
+                             backref='technician',
+                             cascade='all, delete-orphan')
+
 
 class TechnicianSkill(db.Model):
     __tablename__ = 'technician_skills'
@@ -217,6 +222,7 @@ def run_scheduler():
             'assigned_technicians': [tech.tech_id for tech in job.assigned_technicians]
         })
     save_data(schedule_data, SCHEDULE_FILE)
+    
     # Generate metrics and save to METRICS_FILE
     generate_report(scheduler)
     metrics = {
@@ -614,10 +620,27 @@ def view_technicians():
             'name': tech.name,
             'skills': skills_str,
             'hourly_rate': hourly_rate_str,
+            'email':tech.email,
+            'phone_number':tech.phone_number,
             'raw': tech  # Keep original object if needed for actions
         })
     
     return render_template('technicians/technicians.html', technicians=processed_techs)
+
+
+@app.route('/technician/<tech_id>')
+def view_technician(tech_id):
+    # Query the specific technician with their skills
+    tech = Technician.query.options(
+        subqueryload(Technician.skills)
+    ).filter_by(tech_id=tech_id).first_or_404()
+    
+    # Format the hourly rate with 2 decimal places
+    hourly_rate_str = "%.2f" % tech.hourly_rate
+    
+    return render_template('technicians/technician-details.html', 
+                         tech=tech,
+                         hourly_rate_str=hourly_rate_str)
 
 # add technicians route
 @app.route('/technicians/add', methods=['GET', 'POST'])
@@ -858,7 +881,7 @@ def split_job_into_working_hours(job, workday_start_time, workday_end_time, work
             current_time = datetime.datetime.combine(next_day.date(), workday_start_time)
 
     return segments
-
+#=========================================================================
 def create_gantt_chart(schedule):
     segments = []
     workday_start_time = datetime.time(8, 0)  # To be adjusted as needed
@@ -929,6 +952,8 @@ def create_gantt_chart(schedule):
 
     return json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder))
 
+#============================================================================
+
 def create_gantt_chart_new(schedule):
     segments = []
     workday_start_time = datetime.time(8, 0)  # Adjust if needed
@@ -975,47 +1000,62 @@ def create_gantt_chart_new(schedule):
 
     return json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder))
 
-@app.route('/schedule')
-def view_schedule_old():
-    if not os.path.exists(SCHEDULE_FILE):
-        run_scheduler()
-        flash('Initial schedule generated using the greedy algorithm.', 'info')
+# @app.route('/schedule')
+# def view_schedule_old():
+#     if not os.path.exists(SCHEDULE_FILE):
+#         run_scheduler()
+#         flash('Initial schedule generated using the greedy algorithm.', 'info')
+   
+#     schedule_data = load_data(SCHEDULE_FILE)
     
-    schedule_data = load_data(SCHEDULE_FILE)
-    
-    # If schedule_data is a dictionary with 'scheduled_jobs', pass that to create_gantt_chart
-    # Otherwise, pass the whole schedule_data
-    if isinstance(schedule_data, dict) and 'scheduled_jobs' in schedule_data:
-        gantt_fig = create_gantt_chart(schedule_data['scheduled_jobs'])
-        schedule = schedule_data['scheduled_jobs']
-    else:
-        gantt_fig = create_gantt_chart(schedule_data)
-        schedule = schedule_data
+#     # If schedule_data is a dictionary with 'scheduled_jobs', pass that to create_gantt_chart
+#     # Otherwise, pass the whole schedule_data
+#     if isinstance(schedule_data, dict) and 'scheduled_jobs' in schedule_data:
+#         gantt_fig = create_gantt_chart(schedule_data['scheduled_jobs'])
+#         schedule = schedule_data['scheduled_jobs']
+#     else:
+#         gantt_fig = create_gantt_chart(schedule_data)
+#         schedule = schedule_data
 
-    equipment_data = load_data(EQUIPMENT_FILE)
+#     equipment_data = load_data(EQUIPMENT_FILE)
 
-    gantt_chart = json.dumps(gantt_fig, cls=plotly.utils.PlotlyJSONEncoder)
+#     gantt_chart = json.dumps(gantt_fig, cls=plotly.utils.PlotlyJSONEncoder)
     
-    return render_template('schedule.html', gantt_chart=gantt_chart, schedule=schedule, equipment_data=equipment_data)
+#     return render_template('schedule.html', gantt_chart=gantt_chart, schedule=schedule, equipment_data=equipment_data)
 
 @app.route('/schedule')
 def view_schedule():
-    if not os.path.exists(SCHEDULE_FILE):
-        run_scheduler()
-        flash('Initial schedule generated using the greedy algorithm.', 'info')
-    
-    schedule_data = load_data(SCHEDULE_FILE)
-    
+    algorithm = request.args.get('algorithm', 'ortools').lower()  # Default to 'ortools' if none provided
+    schedule_filename = f'optimized_schedule_{algorithm}.json'
+    schedule_path = os.path.join(DATA_DIR, schedule_filename)
+
+    if not os.path.exists(schedule_path):
+        flash(f'No optimized schedule found for algorithm "{algorithm.upper()}". Generating default schedule using the greedy algorithm.', 'info')
+        run_scheduler()  # This will create a fallback SCHEDULE_FILE
+        schedule_data = load_data(SCHEDULE_FILE)
+    else:
+        schedule_data = load_data(schedule_path)
+
+    # Extract schedule and Gantt chart
     if isinstance(schedule_data, dict) and 'scheduled_jobs' in schedule_data:
-        gantt_chart = create_gantt_chart(schedule_data['scheduled_jobs'])
         schedule = schedule_data['scheduled_jobs']
     else:
-        gantt_chart = create_gantt_chart(schedule_data)
         schedule = schedule_data
 
+    gantt_chart = create_gantt_chart(schedule)
     equipment_data = load_data(EQUIPMENT_FILE)
-    
-    return render_template('schedule.html', gantt_chart=gantt_chart, schedule=schedule, equipment_data=equipment_data)
+    return render_template(
+        'schedule.html',
+        gantt_chart=gantt_chart,
+        schedule=schedule,
+        equipment_data=equipment_data,
+        algorithm=algorithm.upper()
+    )
+
+
+
+
+
 
 # Route to serve the Gantt chart image if generated using matplotlib
 @app.route('/gantt_chart.png')
@@ -1065,27 +1105,29 @@ def optimize():
                 flash(f'Optimization failed: {str(e)}', 'danger')
                 return redirect(url_for('optimize'))
         elif algorithm == 'ORTOOLS':
-            from src.optimiser_ortools import optimize_schedule as optimize_ortools
-            try:
+           from src.optimiser_ortools import optimize_schedule as optimize_ortools
+           try:
                 optimized_schedule = optimize_ortools()
                 flash('Optimization with Google OR-Tools completed successfully!', 'success')
-            except Exception as e:
+           except Exception as e:
                 flash(f'Optimization failed: {str(e)}', 'danger')
                 return redirect(url_for('optimize'))
+
         elif algorithm == 'SA':
-            # # To uncomment when Simulated Annealing optimization is implemented
-            # from src.optimiser_sa import optimize_schedule as optimize_sa
-            # try:
-            #     optimized_schedule = optimize_sa()
-            #     flash('Optimization with Simulated Annealing algorithm completed successfully!', 'success')
-            # except Exception as e:
-            #     flash(f'Optimization failed: {str(e)}', 'danger')
-            flash('Simulated Annealing optimization algorithm is not yet implemented.', 'warning') # comment out after implementing SA
+            # To uncomment when Simulated Annealing optimization is implemented
+            from src.optimiser_sa import optimize_schedule as optimize_sa
+            try:
+                optimized_schedule = optimize_sa()
+                flash('Optimization with Simulated Annealing algorithm completed successfully!', 'success')
+            except Exception as e:
+                flash(f'Optimization failed: {str(e)}', 'danger')
+            # flash('Simulated Annealing optimization algorithm is not yet implemented.', 'warning') # comment out after implementing SA
         else:
             flash('Invalid optimization algorithm selected.', 'danger')
             return redirect(url_for('optimize'))
 
         end_time = time.time()
+        start_time = time.time()
         optimization_time = end_time - start_time
 
         # Save the optimized schedule
@@ -1159,6 +1201,7 @@ def optimization_results(algorithm):
             optimization_time = optimization_time.get('time', 'N/A')
         else:
             optimization_time = 'N/A'
+         
 
         return render_template('optimization_results.html', 
                                algorithm=algorithm,
@@ -1176,6 +1219,11 @@ def optimization_results(algorithm):
         traceback.print_exc()
         flash(f"Error displaying optimization results: {str(e)}", 'danger')
         return redirect(url_for('optimize'))
+
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Makespan Controls Route
+# -------------------------------------------------------------------------------------------------------------------------
 
 def calculate_makespan(schedule):
     # print(f"Calculate makespan - Schedule type: {type(schedule)}")

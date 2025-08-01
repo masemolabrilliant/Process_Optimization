@@ -1,0 +1,424 @@
+{
+    "total_jobs": 117,
+    "scheduled_jobs": 17,
+    "unscheduled_jobs": [
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        },
+        {
+            "job_id": "JOB016",
+            "reason": "No available technician with required skills or time slot"
+        }
+    ],
+    "tool_usage": {
+        "TOOL001": 1000,
+        "TOOL002": 300,
+        "TOOL003": 100,
+        "TOOL004": 200,
+        "TOOL005": 0,
+        "TOOL006": 0,
+        "TOOL007": 100
+    },
+    "material_usage": {
+        "MAT001": 2500,
+        "MAT002": 500,
+        "MAT003": 2000,
+        "MAT004": 0,
+        "MAT005": 1000,
+        "MAT006": 200,
+        "MAT007": 500
+    }
+}

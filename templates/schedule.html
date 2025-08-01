@@ -25,7 +25,8 @@
             <div id="gantt-chart" style="height: 600px;"></div>
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <script>
-                var graphJSON = {{ gantt_chart | safe }};
+                var graphJSON = {{ gantt_chart | tojson }};
+
                 Plotly.newPlot('gantt-chart', graphJSON.data, graphJSON.layout);
             </script>
             {% else %}

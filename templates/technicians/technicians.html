@@ -20,16 +20,20 @@
                     <th>Name</th>
                     <th>Skills</th>
                     <th>Hourly Rate</th>
+                    <th>Email</th>
+                    <th>Cell No</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
             {% for tech in technicians %}
-                <tr>
-                    <td>{{ tech.tech_id }}</td>
+                <tr> 
+                    <td><a href="{{ url_for('view_technician', tech_id=tech.tech_id) }}">{{ tech.tech_id }}</a></td>
                     <td>{{ tech.name }}</td>
                     <td>{{ tech.skills }}</td>
                     <td>R{{ tech.hourly_rate }}</td>
+                    <td>{{ tech.email }}</td>
+                    <td>{{ tech.phone_number }}</td>
                     <td>
                         <a href="{{ url_for('edit_technician', tech_id=tech.tech_id) }}" class="btn btn-warning btn-sm">Edit</a>
                         <form action="{{ url_for('delete_technician', tech_id=tech.tech_id) }}" method="post" style="display:inline;">

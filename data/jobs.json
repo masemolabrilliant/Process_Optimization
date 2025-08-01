@@ -6,7 +6,7 @@
         "duration": 4,
         "required_skills": ["mechanical", "electrical"],
         "required_tools": [
-            {"tool_id": "TOOL001", "quantity": 1}
+            {"tool_id": "TOOL001", "quantity": 100}
         ],
         "required_materials": [],
         "precedence": []

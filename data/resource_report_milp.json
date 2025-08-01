@@ -1,0 +1,66 @@
+{
+    "technicians": {
+        "available": 27,
+        "used": 12
+    },
+    "tools": {
+        "TOOL001": {
+            "available": 5,
+            "used": 10
+        },
+        "TOOL002": {
+            "available": 3,
+            "used": 3
+        },
+        "TOOL003": {
+            "available": 2,
+            "used": 1
+        },
+        "TOOL004": {
+            "available": 4,
+            "used": 2
+        },
+        "TOOL005": {
+            "available": 1,
+            "used": 0
+        },
+        "TOOL006": {
+            "available": 2,
+            "used": 0
+        },
+        "TOOL007": {
+            "available": 2,
+            "used": 1
+        }
+    },
+    "materials": {
+        "MAT001": {
+            "available": 200,
+            "used": 25
+        },
+        "MAT002": {
+            "available": 50,
+            "used": 5
+        },
+        "MAT003": {
+            "available": 300,
+            "used": 20
+        },
+        "MAT004": {
+            "available": 100,
+            "used": 0
+        },
+        "MAT005": {
+            "available": 150,
+            "used": 10
+        },
+        "MAT006": {
+            "available": 80,
+            "used": 2
+        },
+        "MAT007": {
+            "available": 60,
+            "used": 5
+        }
+    }
+}

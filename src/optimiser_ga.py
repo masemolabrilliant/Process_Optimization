@@ -1,8 +1,4 @@
-import sys
-import os
-import random
-import datetime
-import json
+import sys, os, random, datetime, json
 from typing import List, Dict, Any, Tuple
 import numpy as np
 
@@ -10,7 +6,9 @@ import numpy as np
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PROJECT_ROOT)
 
-from src.data_handler import load_and_validate_data
+from src.data_handler import load_and_validate_data   
+from src.email_sender import notify_technicians
+
 
 # Data paths
 DATA_DIR = 'data'
@@ -33,8 +31,8 @@ class GeneticAlgorithm:
         self.equipment = data['equipment']
         self.tools = data['tools']
         self.materials = data['materials']
-        self.t_start = datetime.datetime.strptime(data.get('t_start', '2023-12-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
-        self.t_end = datetime.datetime.strptime(data.get('t_end', '2023-12-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
+        self.t_start = datetime.datetime.strptime(data.get('t_start', '2025-07-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
+        self.t_end = datetime.datetime.strptime(data.get('t_end', '2025-07-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
 
     def is_working_hour(self, dt: datetime.datetime) -> bool:
         return dt.weekday() in WORKDAYS and WORKDAY_START <= dt.time() < WORKDAY_END
@@ -210,6 +208,8 @@ def optimize_schedule():
     
     # Save the optimized schedule
     save_optimized_schedule(best_schedule, "GA")
+    # notify_technicians(best_schedule, data['technicians'])
+   
     
     print("Optimization complete. Schedule saved to 'optimized_schedule.json'.")
     return best_schedule

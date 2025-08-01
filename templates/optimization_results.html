@@ -44,7 +44,7 @@
                 <div class="card-body">
                     <p>To explore the optimized schedule in detail:</p>
                     <ul>
-                        <li><a href="{{ url_for('view_schedule') }}">View the optimized schedule</a></li>
+                        <li><a href="{{ url_for('view_schedule', algorithm=algorithm) }}">View the optimized schedule</a></li>
                         <li><a href="{{ url_for('compare_initial_optimized', optimizer=algorithm) }}">Compare with the initial schedule</a></li>
                         <li><a href="{{ url_for('view_metrics') }}">View detailed metrics</a></li>
                     </ul>

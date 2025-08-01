@@ -56,223 +56,7 @@ def save_optimized_schedule(schedule, optimizer_name):
         json.dump(schedule, f, indent=4)
     print(f"\nOptimized schedule saved to {filepath}")
 
-# def optimize_schedule():
-#     print("Loading and validating all data...")
-#     try:
-#         data = load_and_validate_data()
-#     except Exception as e:
-#         print(f"Error loading data: {e}")
-#         return
 
-#     # Extract preprocessed data
-#     jobs_data = data['jobs']
-#     technicians_data = data['technicians']
-#     tools_data = data['tools']
-#     materials_data = data['materials']
-#     equipment_data = data['equipment']
-
-#     # Initialize the CP-SAT model
-#     model = cp_model.CpModel()
-
-#     # Define time parameters
-#     t_start = datetime.datetime.strptime(data.get('t_start', '2023-12-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
-#     t_end = datetime.datetime.strptime(data.get('t_end', '2023-12-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
-#     total_minutes = datetime_to_minutes(t_end, t_start)
-
-#     # Generate working windows
-#     working_windows = generate_working_windows(t_start, t_end)
-
-#     # Create job variables
-#     job_vars = {}
-#     for job in jobs_data:
-#         job_id = job['job_id']
-#         duration = int(job['duration'] * 60)  # Convert hours to minutes
-        
-#         # Create variables for each possible split
-#         splits = []
-#         for s in range(MAX_SPLITS):
-#             start = model.NewIntVar(0, total_minutes, f'start_{job_id}_{s}')
-#             end = model.NewIntVar(0, total_minutes, f'end_{job_id}_{s}')
-#             duration_var = model.NewIntVar(0, duration, f'duration_{job_id}_{s}')
-#             is_used = model.NewBoolVar(f'is_used_{job_id}_{s}')
-            
-#             # Link the variables
-#             model.Add(end == start + duration_var)
-#             model.Add(duration_var == 0).OnlyEnforceIf(is_used.Not())
-#             model.Add(duration_var > 0).OnlyEnforceIf(is_used)
-            
-#             splits.append((start, end, duration_var, is_used))
-        
-#         job_vars[job_id] = splits
-
-#         # Ensure total duration matches the job's required duration
-#         model.Add(sum(split[2] for split in splits) == duration)
-
-#         # Ensure splits are in order
-#         for s in range(MAX_SPLITS - 1):
-#             model.Add(splits[s][1] <= splits[s+1][0]).OnlyEnforceIf(splits[s][3], splits[s+1][3])
-
-#     # Add constraints
-#     # ... (previous code remains the same)
-
-#     # 1. Equipment constraints
-#     equipment_usage = {equip['equipment_id']: [] for equip in equipment_data}
-#     for job in jobs_data:
-#         job_id = job['job_id']
-#         equip_id = job['equipment_id']
-#         for s, split in enumerate(job_vars[job_id]):
-#             start, end, duration, is_used = split
-#             interval = model.NewOptionalIntervalVar(
-#                 start, 
-#                 duration,
-#                 model.NewIntVar(0, total_minutes, f'end_{job_id}_split{s}'),
-#                 is_used,
-#                 f'equip_{equip_id}_{job_id}_split{s}'
-#             )
-#             equipment_usage[equip_id].append(interval)
-
-#     for equip_id, usage in equipment_usage.items():
-#         model.AddNoOverlap(usage)
-
-#     # 2. Technician constraints
-#     technician_usage = {tech['tech_id']: [] for tech in technicians_data}
-#     for job in jobs_data:
-#         job_id = job['job_id']
-#         required_skills = set(job['required_skills'])
-#         for tech in technicians_data:
-#             if set(tech['skills']).intersection(required_skills):
-#                 for s, split in enumerate(job_vars[job_id]):
-#                     start, end, duration, is_used = split
-#                     interval = model.NewOptionalIntervalVar(
-#                         start, 
-#                         duration,
-#                         model.NewIntVar(0, total_minutes, f'tech_end_{tech["tech_id"]}_{job_id}_split{s}'),
-#                         is_used,
-#                         f'tech_{tech["tech_id"]}_{job_id}_split{s}'
-#                     )
-#                     technician_usage[tech['tech_id']].append(interval)
-
-#     for tech_id, usage in technician_usage.items():
-#         model.AddNoOverlap(usage)
-
-#     # 3. Tool constraints
-#     tool_usage = {tool['tool_id']: [] for tool in tools_data}
-#     for job in jobs_data:
-#         job_id = job['job_id']
-#         for tool_req in job['required_tools']:
-#             tool_id = tool_req['tool_id']
-#             quantity = tool_req['quantity']
-#             for s, split in enumerate(job_vars[job_id]):
-#                 start, end, duration, is_used = split
-#                 interval = model.NewOptionalIntervalVar(
-#                     start, 
-#                     duration,
-#                     model.NewIntVar(0, total_minutes, f'tool_end_{tool_id}_{job_id}_split{s}'),
-#                     is_used,
-#                     f'tool_{tool_id}_{job_id}_split{s}'
-#                 )
-#                 tool_usage[tool_id].append((interval, quantity))
-
-#     for tool_id, usage in tool_usage.items():
-#         tool_capacity = next(tool['quantity'] for tool in tools_data if tool['tool_id'] == tool_id)
-#         intervals = [u[0] for u in usage]
-#         demands = [u[1] for u in usage]
-#         model.AddCumulative(intervals, demands, tool_capacity)
-
-#     # ... (rest of the code remains the same)
-
-#     # 4. Material constraints
-#     for job in jobs_data:
-#         job_id = job['job_id']
-#         for mat_req in job['required_materials']:
-#             mat_id = mat_req['material_id']
-#             quantity = mat_req['quantity']
-#             material = next(m for m in materials_data if m['material_id'] == mat_id)
-#             model.Add(sum(split[2] for split in job_vars[job_id]) * quantity <= material['quantity'] * total_minutes)
-
-#     # 5. Precedence constraints
-#     for job in jobs_data:
-#         job_id = job['job_id']
-#         for pred_id in job['precedence']:
-#             model.Add(job_vars[pred_id][-1][1] <= job_vars[job_id][0][0]).OnlyEnforceIf(job_vars[job_id][0][3])
-
-#     # ... (previous code remains the same)
-
-#     # 6. Working windows constraints
-#     for job_id, splits in job_vars.items():
-#         for split in splits:
-#             start, end, duration, is_used = split
-#             window_constraints = []
-#             for w_start, w_end in working_windows:
-#                 in_window = model.NewBoolVar(f'{job_id}_in_window_{w_start}_{w_end}')
-#                 model.Add(start >= w_start).OnlyEnforceIf(in_window)
-#                 model.Add(end <= w_end).OnlyEnforceIf(in_window)
-#                 window_constraints.append(in_window)
-            
-#             # The job split must be in at least one working window if it's used
-#             model.Add(sum(window_constraints) >= 1).OnlyEnforceIf(is_used)
-#             model.Add(sum(window_constraints) == 0).OnlyEnforceIf(is_used.Not())
-
-#     # ... (rest of the code remains the same)
-
-#     # Objective: Minimize makespan and maximize scheduled jobs
-#     makespan = model.NewIntVar(0, total_minutes, 'makespan')
-#     model.AddMaxEquality(makespan, [split[1] for splits in job_vars.values() for split in splits])
-    
-#     total_scheduled = sum(split[3] for splits in job_vars.values() for split in splits)
-#     model.Maximize(total_scheduled * total_minutes - makespan)
-
-#     # Solve the problem
-#     solver = cp_model.CpSolver()
-#     solver.parameters.max_time_in_seconds = 300.0  # 5 minutes limit
-#     status = solver.Solve(model)
-
-#     # Process results
-#     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-#         optimized_schedule = []
-#         for job in jobs_data:
-#             job_id = job['job_id']
-#             job_splits = []
-#             for s, split in enumerate(job_vars[job_id]):
-#                 if solver.Value(split[3]):  # if this split is used
-#                     start_time = minutes_to_datetime(solver.Value(split[0]), t_start)
-#                     end_time = minutes_to_datetime(solver.Value(split[1]), t_start)
-#                     job_splits.append({
-#                         'split_id': s + 1,
-#                         'scheduled_start_time': start_time.strftime('%Y-%m-%dT%H:%M:%S'),
-#                         'scheduled_end_time': end_time.strftime('%Y-%m-%dT%H:%M:%S'),
-#                         'duration_minutes': solver.Value(split[1]) - solver.Value(split[0])
-#                     })
-#             if job_splits:
-#                 assigned_technicians = [
-#                     tech['tech_id'] for tech in technicians_data
-#                     if set(tech['skills']).intersection(set(job['required_skills']))
-#                 ]
-#                 optimized_schedule.append({
-#                     'job_id': job_id,
-#                     'equipment_id': job['equipment_id'],
-#                     'assigned_technicians': assigned_technicians,
-#                     'splits': job_splits
-#                 })
-
-#         # Save the optimized schedule
-#         optimized_schedule_path = os.path.join(DATA_DIR, 'optimized_schedule.json')
-#         with open(optimized_schedule_path, 'w') as f:
-#             json.dump(optimized_schedule, f, indent=4)
-#         print(f"\nOptimized schedule saved to {optimized_schedule_path}")
-
-#         # Calculate and print statistics
-#         total_jobs = len(jobs_data)
-#         scheduled_jobs = len(optimized_schedule)
-#         print(f"\nTotal jobs: {total_jobs}")
-#         print(f"Scheduled jobs: {scheduled_jobs}")
-#         print(f"Scheduling rate: {scheduled_jobs/total_jobs*100:.2f}%")
-#         print(f"Makespan: {solver.Value(makespan)} minutes")
-
-#     else:
-#         print("No optimal or feasible solution found.")
-
-#     return optimized_schedule if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE else None
 
 def optimize_schedule():
     print("Loading and validating all data...")
@@ -280,6 +64,32 @@ def optimize_schedule():
 
     jobs_data = data['jobs']
     technicians_data = data['technicians']
+    #87866666666666666666666666666666666666666666666666666666
+
+    print("Validating technician-job skill matches...")
+    valid_jobs_data = []
+    invalid_jobs = []
+
+    for job in jobs_data:
+        required_skills = set(job['required_skills'])
+        matching_techs = [
+            tech for tech in technicians_data
+            if required_skills & set(tech['skills'])
+        ]
+        if not matching_techs:
+            invalid_jobs.append(job['job_id'])
+        else:
+            valid_jobs_data.append(job)
+
+    # Inform about skipped jobs
+    if invalid_jobs:
+        print(f"⚠️ Skipping jobs with no matching technicians: {invalid_jobs}")
+
+    jobs_data = valid_jobs_data  # Use only valid jobs
+
+    #8799999999999999999999999999999999999999999999999999999
+
+    
     tools_data = data['tools']
     materials_data = data['materials']
     equipment_data = data['equipment']
@@ -327,35 +137,52 @@ def optimize_schedule():
                                                  f'interval_{j["job_id"]}')
                             for j in equip_jobs])
 
-    # Technician constraints and assignment variables
-    tech_vars = {}
-    tech_assignment_vars = {}
+    
+    # Technician constraints and assignment variables (fixed overbooking)
+    tech_assignment_vars = {}  # Map: tech_id -> { job_id -> BoolVar }
     for tech in technicians_data:
         tech_id = tech['tech_id']
-        tech_jobs = []
         tech_assignment_vars[tech_id] = {}
-        for job in jobs_data:
-            if set(tech['skills']).intersection(set(job['required_skills'])):
-                is_assigned = model.NewBoolVar(f'tech_{tech_id}_assigned_to_{job["job_id"]}')
-                tech_assignment_vars[tech_id][job['job_id']] = is_assigned
-                interval = model.NewOptionalIntervalVar(
-                    job_vars[job['job_id']][0],
-                    job['duration'] * 60,
-                    job_vars[job['job_id']][1],
-                    is_assigned,
-                    f'tech_{tech_id}_interval_{job["job_id"]}'
-                )
-                tech_jobs.append(interval)
-        model.AddNoOverlap(tech_jobs)
-        tech_vars[tech_id] = tech_jobs
 
-    # Ensure correct number of technicians are assigned to each job
+        # Collect all job intervals for this technician
+        tech_intervals = []
+
+        for job in jobs_data:
+            job_id = job['job_id']
+
+            # Check if technician can work on this job
+            if set(tech['skills']).intersection(set(job['required_skills'])):
+                is_assigned = model.NewBoolVar(f'tech_{tech_id}_assigned_to_{job_id}')
+                tech_assignment_vars[tech_id][job_id] = is_assigned
+
+                # Technician interval linked to job interval
+                interval = model.NewOptionalIntervalVar(
+                    job_vars[job_id][0],
+                    int(job['duration'] * 60),
+                    job_vars[job_id][1],
+                    is_assigned,
+                    f'tech_{tech_id}_interval_{job_id}'
+                )
+                tech_intervals.append(interval)
+
+        # Ensure this technician is not double-booked
+        if tech_intervals:
+            model.AddNoOverlap(tech_intervals)
+
+    # Ensure each job has the required number of distinct technicians
     for job in jobs_data:
         job_id = job['job_id']
-        model.Add(sum(tech_assignment_vars[tech['tech_id']][job_id]
-                      for tech in technicians_data
-                      if job_id in tech_assignment_vars[tech['tech_id']]) == 
-                  len(job['required_skills']))
+
+        # Count distinct technicians assigned to this job
+        tech_count = [
+            tech_assignment_vars[tech['tech_id']][job_id]
+            for tech in technicians_data
+            if job_id in tech_assignment_vars[tech['tech_id']]
+        ]
+
+        # Job must have at least one technician per required skill (or as needed)
+        model.Add(sum(tech_count) >= len(set(job['required_skills'])))
+
 
     # Tool constraints
     for tool in tools_data:
@@ -422,6 +249,7 @@ def optimize_schedule():
 
         # Save the optimized schedule
         save_optimized_schedule(optimized_schedule, "OR-Tools")
+       
 
         # Calculate and print statistics
         total_jobs = len(jobs_data)
@@ -430,6 +258,7 @@ def optimize_schedule():
         print(f"Scheduled jobs: {scheduled_jobs}")
         print(f"Scheduling rate: {scheduled_jobs/total_jobs*100:.2f}%")
         print(f"Makespan: {solver.Value(makespan)} minutes")
+       
 
     else:
         print("No optimal or feasible solution found.")

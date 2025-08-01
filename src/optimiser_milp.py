@@ -1,24 +1,52 @@
 import sys
 import os
+import json
+import datetime
+from datetime import timedelta
+from typing import Any, List, Dict, Tuple
+from ortools.sat.python import cp_model
+
 # Add the root directory to the system path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PROJECT_ROOT)
 
-import datetime
-from typing import List, Dict, Tuple
-from pulp import *
-from src.data_handler import load_json, load_and_validate_data
+from src.data_handler import load_and_validate_data
 
 # Data paths
 DATA_DIR = 'data'
+SCHEDULE_FILE = 'schedule.json'
 
 # Define working hours
 WORKDAY_START = datetime.time(8, 0)
 WORKDAY_END = datetime.time(17, 0)
-WORKDAYS = {0, 1, 2, 3, 4}  # Monday to Friday
+WORKDAYS = set([0, 1, 2, 3, 4])  # Monday=0, ..., Friday=4
 
-def is_working_hour(dt: datetime.datetime) -> bool:
-    return dt.weekday() in WORKDAYS and WORKDAY_START <= dt.time() < WORKDAY_END
+# Maximum number of splits allowed per job
+MAX_SPLITS = 5
+
+def datetime_to_minutes(dt: datetime.datetime, t_start: datetime.datetime) -> int:
+    return int((dt - t_start).total_seconds() / 60)
+
+def minutes_to_datetime(minutes: int, t_start: datetime.datetime) -> datetime.datetime:
+    return t_start + timedelta(minutes=minutes)
+
+def generate_working_windows(t_start: datetime.datetime, t_end: datetime.datetime) -> List[Tuple[int, int]]:
+    current = t_start
+    working_windows = []
+    while current < t_end:
+        if current.weekday() in WORKDAYS:
+            day_start = datetime.datetime.combine(current.date(), WORKDAY_START)
+            day_end = datetime.datetime.combine(current.date(), WORKDAY_END)
+            if day_start < t_start:
+                day_start = t_start
+            if day_end > t_end:
+                day_end = t_end
+            if day_start < day_end:
+                start_min = datetime_to_minutes(day_start, t_start)
+                end_min = datetime_to_minutes(day_end, t_start)
+                working_windows.append((start_min, end_min))
+        current += timedelta(days=1)
+    return working_windows
 
 def save_optimized_schedule(schedule, optimizer_name):
     filename = f'optimized_schedule_{optimizer_name.lower()}.json'
@@ -27,154 +55,170 @@ def save_optimized_schedule(schedule, optimizer_name):
         json.dump(schedule, f, indent=4)
     print(f"\nOptimized schedule saved to {filepath}")
 
+def save_unscheduled_jobs(unscheduled_jobs, optimizer_name):
+    filename = f'unscheduled_jobs_{optimizer_name.lower()}.json'
+    filepath = os.path.join(DATA_DIR, filename)
+    with open(filepath, 'w') as f:
+        json.dump(unscheduled_jobs, f, indent=4)
+    print(f"Saved unscheduled jobs with reasons to {filepath}")
+
 def optimize_schedule():
-    # Load data
+    print("Loading and validating all data...")
     data = load_and_validate_data()
-    
-    # Extract data into usable structures
-    jobs = data['jobs']
-    technicians = data['technicians']
-    equipment = data['equipment']
-    tools = data['tools']
-    materials = data['materials']
-    
-    # Define the scheduling horizon
+    jobs_data = data['jobs']
+    technicians_data = data['technicians']
+    tools_data = data['tools']
+    materials_data = data['materials']
+    equipment_data = data['equipment']
+
     t_start = datetime.datetime.strptime(data.get('t_start', '2023-12-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
     t_end = datetime.datetime.strptime(data.get('t_end', '2023-12-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
-    
-    # Discretize the time horizon into hourly intervals
-    time_slots = []
-    current_time = t_start
-    while current_time < t_end:
-        time_slots.append(current_time)
-        current_time += datetime.timedelta(hours=1)
-    
-    # Create lists of IDs
-    job_ids = [job['job_id'] for job in jobs]
-    tech_ids = [tech['tech_id'] for tech in technicians]
-    equip_ids = [equip['equipment_id'] for equip in equipment]
-    tool_ids = [tool['tool_id'] for tool in tools]
-    material_ids = [material['material_id'] for material in materials]
-    
-    # Initialize the problem
-    prob = LpProblem("Maintenance_Scheduling", LpMinimize)
-    
-    # Decision variables
-    x = LpVariable.dicts("job_start", 
-                         ((j, t) for j in job_ids for t in range(len(time_slots))), 
-                         cat='Binary')
-    
-    y = LpVariable.dicts("tech_assignment", 
-                         ((j, k, t) for j in job_ids for k in tech_ids for t in range(len(time_slots))), 
-                         cat='Binary')
-    
-    # Objective function: Minimize makespan
-    makespan = LpVariable("makespan", lowBound=0)
-    prob += makespan
-    
-    for j in job_ids:
-        job = next(job for job in jobs if job['job_id'] == j)
-        prob += makespan >= lpSum([t * x[j, t] for t in range(len(time_slots))]) + job['duration']
-    
-    # Constraints
-    
-    # 1. Each job must start exactly once
-    for j in job_ids:
-        prob += lpSum([x[j, t] for t in range(len(time_slots))]) == 1
-    
-    # 2. Jobs must finish within the scheduling horizon and respect working hours
-    for j in job_ids:
-        job = next(job for job in jobs if job['job_id'] == j)
-        for t in range(len(time_slots)):
-            if not all(is_working_hour(time_slots[t + d]) for d in range(job['duration']) if t + d < len(time_slots)):
-                prob += x[j, t] == 0
-    
-    # 3. Equipment constraints
-    for e in equip_ids:
-        for t in range(len(time_slots)):
-            prob += lpSum([x[j, t_start] 
-                           for j in job_ids 
-                           for t_start in range(max(0, t - int(next(job for job in jobs if job['job_id'] == j)['duration']) + 1), t + 1) 
-                           if next(job for job in jobs if job['job_id'] == j)['equipment_id'] == e]) <= 1
-    
-    # 4. Technician assignment and skill coverage
-    for j in job_ids:
-        job = next(job for job in jobs if job['job_id'] == j)
+
+    print("Validating technician-job skill matches and resource availability...")
+    valid_jobs_data = []
+    unscheduled_jobs = []
+
+    tool_stock = {tool['tool_id']: tool['quantity'] for tool in tools_data}
+    material_stock = {mat['material_id']: mat['quantity'] for mat in materials_data}
+
+    for job in jobs_data:
+        reasons = []
+
         required_skills = set(job['required_skills'])
-        for t in range(len(time_slots)):
-            # Ensure that all required skills are covered by assigned technicians
-            for skill in required_skills:
-                prob += lpSum([y[j, k, t] for k in tech_ids if skill in next(tech for tech in technicians if tech['tech_id'] == k)['skills']]) >= x[j, t]
+        matching_techs = [tech for tech in technicians_data if required_skills & set(tech['skills'])]
+        if not matching_techs:
+            reasons.append("No matching technicians with required skills")
+
+        for req_tool in job['required_tools']:
+            if tool_stock.get(req_tool['tool_id'], 0) < req_tool['quantity']:
+                reasons.append(f"Tool {req_tool['tool_id']} unavailable or insufficient")
+
+        for req_mat in job['required_materials']:
+            if material_stock.get(req_mat['material_id'], 0) < req_mat['quantity']:
+                reasons.append(f"Material {req_mat['material_id']} unavailable or insufficient")
+
+        if reasons:
+            unscheduled_jobs.append({"job_id": job['job_id'], "reason": reasons})
+        else:
+            valid_jobs_data.append(job)
+
+    if unscheduled_jobs:
+        save_unscheduled_jobs(unscheduled_jobs, "ortools")
+        print("\n⚠️ Unscheduled jobs:")
+        for item in unscheduled_jobs:
+            print(f"- {item['job_id']}: {', '.join(item['reason'])}")
+
+    jobs_data = valid_jobs_data
+    if not jobs_data:
+        print("No jobs left to schedule after validation.")
+        return None
+
+    total_minutes = int((t_end - t_start).total_seconds() / 60)
+    working_windows = generate_working_windows(t_start, t_end)
+    model = cp_model.CpModel()
+
+    job_vars = {}
+    for job in jobs_data:
+        job_id = job['job_id']
+        duration = int(job['duration'] * 60)
+        start = model.NewIntVar(0, total_minutes, f'start_{job_id}')
+        end = model.NewIntVar(0, total_minutes, f'end_{job_id}')
+        model.Add(end - start == duration)
+        window_constraints = []
+        for w_start, w_end in working_windows:
+            is_in_window = model.NewBoolVar(f'{job_id}_in_window_{w_start}_{w_end}')
+            model.Add(start >= w_start).OnlyEnforceIf(is_in_window)
+            model.Add(end <= w_end).OnlyEnforceIf(is_in_window)
+            window_constraints.append(is_in_window)
+        model.Add(sum(window_constraints) >= 1)
+        job_vars[job_id] = (start, end)
+
+    for equip in equipment_data:
+        equip_jobs = [j for j in jobs_data if j['equipment_id'] == equip['equipment_id']]
+        model.AddNoOverlap([model.NewIntervalVar(job_vars[j['job_id']][0], j['duration'] * 60, job_vars[j['job_id']][1], f'interval_{j["job_id"]}') for j in equip_jobs])
+
+    tech_assignment_vars = {}
+    for tech in technicians_data:
+        tech_id = tech['tech_id']
+        tech_assignment_vars[tech_id] = {}
+        tech_intervals = []
+        for job in jobs_data:
+            job_id = job['job_id']
+            if set(tech['skills']).intersection(set(job['required_skills'])):
+                is_assigned = model.NewBoolVar(f'tech_{tech_id}_assigned_to_{job_id}')
+                tech_assignment_vars[tech_id][job_id] = is_assigned
+                interval = model.NewOptionalIntervalVar(job_vars[job_id][0], int(job['duration'] * 60), job_vars[job_id][1], is_assigned, f'tech_{tech_id}_interval_{job_id}')
+                tech_intervals.append(interval)
+        if tech_intervals:
+            model.AddNoOverlap(tech_intervals)
+
+    for job in jobs_data:
+        job_id = job['job_id']
+        tech_count = [tech_assignment_vars[tech['tech_id']][job_id] for tech in technicians_data if job_id in tech_assignment_vars[tech['tech_id']]]
+        model.Add(sum(tech_count) >= len(set(job['required_skills'])))
+
+    for tool in tools_data:
+        tool_id = tool['tool_id']
+        tool_capacity = tool['quantity']
+        tool_usage = []
+        for job in jobs_data:
+            for req_tool in job['required_tools']:
+                if req_tool['tool_id'] == tool_id:
+                    interval = model.NewIntervalVar(job_vars[job['job_id']][0], job['duration'] * 60, job_vars[job['job_id']][1], f'tool_{tool_id}_interval_{job["job_id"]}')
+                    tool_usage.append((interval, req_tool['quantity']))
+        if tool_usage:
+            model.AddCumulative([u[0] for u in tool_usage], [u[1] for u in tool_usage], tool_capacity)
+
+    for material in materials_data:
+        material_id = material['material_id']
+        material_capacity = material['quantity']
+        material_usage = 0
+        for job in jobs_data:
+            for req_material in job['required_materials']:
+                if req_material['material_id'] == material_id:
+                    material_usage += req_material['quantity']
+        model.Add(material_usage <= material_capacity)
+
+    for job in jobs_data:
+        for pred_id in job['precedence']:
+            model.Add(job_vars[job['job_id']][0] >= job_vars[pred_id][1])
+
+    makespan = model.NewIntVar(0, total_minutes, 'makespan')
+    model.AddMaxEquality(makespan, [end for _, end in job_vars.values()])
+    model.Minimize(makespan)
+
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 300.0
+    status = solver.Solve(model)
+
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        optimized_schedule = []
+        for job in jobs_data:
+            job_id = job['job_id']
+            start_time = minutes_to_datetime(solver.Value(job_vars[job_id][0]), t_start)
+            end_time = minutes_to_datetime(solver.Value(job_vars[job_id][1]), t_start)
+            assigned_technicians = [tech['tech_id'] for tech in technicians_data if job_id in tech_assignment_vars[tech['tech_id']] and solver.Value(tech_assignment_vars[tech['tech_id']][job_id])]
+            optimized_schedule.append({
+                'job_id': job_id,
+                'equipment_id': job['equipment_id'],
+                'scheduled_start_time': start_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                'scheduled_end_time': end_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                'duration_hours': job['duration'],
+                'assigned_technicians': assigned_technicians
+            })
+
+
             
-            # Ensure at least one technician is assigned when the job starts
-            prob += lpSum([y[j, k, t] for k in tech_ids]) >= x[j, t]
-            
-            # Ensure no more technicians than required skills are assigned
-            prob += lpSum([y[j, k, t] for k in tech_ids]) <= len(required_skills) * x[j, t]
-    
-    # 5. Technician availability (only during working hours)
-    for k in tech_ids:
-        for t in range(len(time_slots)):
-            if is_working_hour(time_slots[t]):
-                prob += lpSum([y[j, k, t_start]
-                               for j in job_ids 
-                               for t_start in range(max(0, t - int(next(job for job in jobs if job['job_id'] == j)['duration']) + 1), t + 1)]) <= 1
-            else:
-                prob += lpSum([y[j, k, t] for j in job_ids]) == 0
-    
-    # 6. Precedence constraints
-    for j in job_ids:
-        job = next(job for job in jobs if job['job_id'] == j)
-        for p in job['precedence']:
-            prob += lpSum([t * x[j, t] for t in range(len(time_slots))]) >= \
-                    lpSum([t * x[p, t] for t in range(len(time_slots))]) + \
-                    next(pred_job for pred_job in jobs if pred_job['job_id'] == p)['duration']
-    
-    # 7. Tool constraints (only during working hours)
-    for tool in tools:
-        for t in range(len(time_slots)):
-            if is_working_hour(time_slots[t]):
-                prob += lpSum([x[j, t_start] * next((req['quantity'] for req in job['required_tools'] if req['tool_id'] == tool['tool_id']), 0)
-                               for j in job_ids 
-                               for job in jobs if job['job_id'] == j
-                               for t_start in range(max(0, t - int(job['duration']) + 1), t + 1)]) <= tool['quantity']
-    
-    # 8. Material constraints
-    for material in materials:
-        prob += lpSum([x[j, t] * next((req['quantity'] for req in job['required_materials'] if req['material_id'] == material['material_id']), 0)
-                       for j in job_ids
-                       for job in jobs if job['job_id'] == j
-                       for t in range(len(time_slots))]) <= material['quantity']
-    
-    # Solve the problem
-    solver = pulp.PULP_CBC_CMD(msg=True, timeLimit=600)  # 10 minutes time limit
-    prob.solve(solver)
-    
-    # Extract the results
-    if LpStatus[prob.status] == "Optimal" or LpStatus[prob.status] == "Feasible":
-        schedule = []
-        for j in job_ids:
-            job = next(job for job in jobs if job['job_id'] == j)
-            start_time = next((time_slots[t] for t in range(len(time_slots)) if value(x[j, t]) == 1), None)
-            if start_time:
-                end_time = start_time + datetime.timedelta(hours=job['duration'])
-                assigned_techs = list(set([k for k in tech_ids for t in range(len(time_slots)) if value(y[j, k, t]) == 1]))
-                
-                schedule.append({
-                    'job_id': j,
-                    'equipment_id': job['equipment_id'],
-                    'scheduled_start_time': start_time.strftime('%Y-%m-%dT%H:%M:%S'),
-                    'scheduled_end_time': end_time.strftime('%Y-%m-%dT%H:%M:%S'),
-                    'assigned_technicians': assigned_techs
-                })
-        
-        # Save the optimized schedule
-        save_optimized_schedule(schedule, "MILP")
-        
-        print(f"Optimal schedule found with makespan: {value(makespan)} hours")
-        return schedule
+
+        save_optimized_schedule(optimized_schedule, "OR-Tools")
+        print(f"\nTotal jobs: {len(data['jobs'])}")
+        print(f"Scheduled jobs: {len(optimized_schedule)}")
+        print(f"Unscheduled jobs: {len(unscheduled_jobs)}")
+        print(f"Scheduling rate: {len(optimized_schedule)/len(data['jobs'])*100:.2f}%")
+        print(f"Makespan: {solver.Value(makespan)} minutes")
+        return optimized_schedule
     else:
-        print(f"No optimal solution found. Status: {LpStatus[prob.status]}")
+        print("No optimal or feasible solution found.")
         return None
 
 if __name__ == "__main__":
