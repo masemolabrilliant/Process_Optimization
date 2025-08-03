@@ -1,81 +1,62 @@
 [
     {
-        "job_id": "JOB001",
-        "equipment_id": "EQUIP001",
-        "scheduled_start_time": "2025-07-03T08:00:00",
-        "scheduled_end_time": "2025-07-03T12:00:00",
-        "assigned_technicians": [
-            "TECH025"
-        ]
-    },
-    {
-        "job_id": "JOB002",
-        "equipment_id": "EQUIP001",
-        "scheduled_start_time": "2025-07-04T08:00:00",
-        "scheduled_end_time": "2025-07-04T14:00:00",
-        "assigned_technicians": [
-            "TECH001",
-            "TECH021"
-        ]
-    },
-    {
         "job_id": "JOB003",
         "equipment_id": "EQUIP002",
-        "scheduled_start_time": "2025-07-07T13:00:00",
-        "scheduled_end_time": "2025-07-07T16:00:00",
+        "scheduled_start_time": "2025-07-03T08:00:00",
+        "scheduled_end_time": "2025-07-03T11:00:00",
         "assigned_technicians": [
-            "TECH008",
-            "TECH010"
+            "TECH025",
+            "TECH015"
         ]
     },
     {
         "job_id": "JOB004",
         "equipment_id": "EQUIP002",
-        "scheduled_start_time": "2025-07-01T08:00:00",
-        "scheduled_end_time": "2025-07-01T10:00:00",
+        "scheduled_start_time": "2025-07-03T08:00:00",
+        "scheduled_end_time": "2025-07-03T10:00:00",
         "assigned_technicians": [
-            "TECH006",
+            "TECH020",
             "TECH011"
         ]
     },
     {
         "job_id": "JOB005",
         "equipment_id": "EQUIP003",
-        "scheduled_start_time": "2025-07-07T08:00:00",
-        "scheduled_end_time": "2025-07-07T13:00:00",
+        "scheduled_start_time": "2025-07-02T08:00:00",
+        "scheduled_end_time": "2025-07-02T13:00:00",
         "assigned_technicians": [
-            "TECH022",
-            "TECH003"
+            "TECH003",
+            "TECH028"
         ]
     },
     {
         "job_id": "JOB006",
         "equipment_id": "EQUIP004",
-        "scheduled_start_time": "2025-07-04T08:00:00",
-        "scheduled_end_time": "2025-07-04T11:00:00",
-        "assigned_technicians": [
-            "TECH003",
-            "TECH007"
-        ]
-    },
-    {
-        "job_id": "JOB007",
-        "equipment_id": "EQUIP003",
-        "scheduled_start_time": "2025-07-07T08:00:00",
-        "scheduled_end_time": "2025-07-07T10:00:00",
+        "scheduled_start_time": "2025-07-03T08:00:00",
+        "scheduled_end_time": "2025-07-03T11:00:00",
         "assigned_technicians": [
             "TECH017",
             "TECH001"
         ]
     },
     {
+        "job_id": "JOB007",
+        "equipment_id": "EQUIP003",
+        "scheduled_start_time": "2025-07-03T11:00:00",
+        "scheduled_end_time": "2025-07-03T13:00:00",
+        "assigned_technicians": [
+            "TECH017",
+            "TECH025"
+        ]
+    },
+    {
         "job_id": "JOB008",
         "equipment_id": "EQUIP005",
-        "scheduled_start_time": "2025-07-03T08:00:00",
-        "scheduled_end_time": "2025-07-03T12:00:00",
+        "scheduled_start_time": "2025-07-04T08:00:00",
+        "scheduled_end_time": "2025-07-04T12:00:00",
         "assigned_technicians": [
-            "TECH003",
-            "TECH007"
+            "TECH017",
+            "TECH012"
         ]
     },
     {
@@ -84,28 +65,28 @@
         "scheduled_start_time": "2025-07-03T08:00:00",
         "scheduled_end_time": "2025-07-03T11:00:00",
         "assigned_technicians": [
-            "TECH004",
+            "TECH021",
             "TECH010"
         ]
     },
     {
         "job_id": "JOB010",
         "equipment_id": "EQUIP006",
-        "scheduled_start_time": "2025-07-07T15:00:00",
-        "scheduled_end_time": "2025-07-07T17:00:00",
+        "scheduled_start_time": "2025-07-02T08:00:00",
+        "scheduled_end_time": "2025-07-02T10:00:00",
         "assigned_technicians": [
             "TECH001",
-            "TECH003"
+            "TECH009"
         ]
     },
     {
         "job_id": "JOB011",
         "equipment_id": "EQUIP007",
-        "scheduled_start_time": "2025-07-04T08:00:00",
-        "scheduled_end_time": "2025-07-04T12:00:00",
+        "scheduled_start_time": "2025-07-01T08:00:00",
+        "scheduled_end_time": "2025-07-01T12:00:00",
         "assigned_technicians": [
-            "TECH006",
-            "TECH008"
+            "TECH027",
+            "TECH017"
         ]
     },
     {
@@ -114,28 +95,28 @@
         "scheduled_start_time": "2025-07-07T08:00:00",
         "scheduled_end_time": "2025-07-07T11:00:00",
         "assigned_technicians": [
-            "TECH023",
-            "TECH018"
+            "TECH028",
+            "TECH008"
         ]
     },
     {
         "job_id": "JOB013",
         "equipment_id": "EQUIP008",
-        "scheduled_start_time": "2025-07-02T08:00:00",
-        "scheduled_end_time": "2025-07-02T13:00:00",
+        "scheduled_start_time": "2025-07-03T12:00:00",
+        "scheduled_end_time": "2025-07-03T17:00:00",
         "assigned_technicians": [
-            "TECH014",
-            "TECH001"
+            "TECH017",
+            "TECH021"
         ]
     },
     {
         "job_id": "JOB014",
         "equipment_id": "EQUIP008",
-        "scheduled_start_time": "2025-07-01T08:00:00",
-        "scheduled_end_time": "2025-07-01T11:00:00",
+        "scheduled_start_time": "2025-07-02T08:00:00",
+        "scheduled_end_time": "2025-07-02T11:00:00",
         "assigned_technicians": [
             "TECH025",
-            "TECH009"
+            "TECH021"
         ]
     },
     {
@@ -144,35 +125,28 @@
         "scheduled_start_time": "2025-07-02T08:00:00",
         "scheduled_end_time": "2025-07-02T12:00:00",
         "assigned_technicians": [
-            "TECH004",
-            "TECH008"
+            "TECH018",
+            "TECH015"
         ]
-    },
-    {
-        "job_id": "JOB016",
-        "equipment_id": "EQUIP006",
-        "scheduled_start_time": "2025-07-07T10:00:00",
-        "scheduled_end_time": "2025-07-07T12:00:00",
-        "assigned_technicians": []
     },
     {
         "job_id": "JOB017",
         "equipment_id": "EQUIP005",
-        "scheduled_start_time": "2025-07-02T08:00:00",
-        "scheduled_end_time": "2025-07-02T11:00:00",
+        "scheduled_start_time": "2025-07-07T08:00:00",
+        "scheduled_end_time": "2025-07-07T11:00:00",
         "assigned_technicians": [
-            "TECH021",
-            "TECH010"
+            "TECH016",
+            "TECH004"
         ]
     },
     {
         "job_id": "JOB018",
         "equipment_id": "EQUIP001",
-        "scheduled_start_time": "2025-07-02T08:00:00",
-        "scheduled_end_time": "2025-07-02T10:00:00",
+        "scheduled_start_time": "2025-07-01T09:00:00",
+        "scheduled_end_time": "2025-07-01T11:00:00",
         "assigned_technicians": [
-            "TECH001",
-            "TECH017"
+            "TECH007",
+            "TECH025"
         ]
     }
 ]

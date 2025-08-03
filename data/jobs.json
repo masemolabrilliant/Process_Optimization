@@ -21,7 +21,7 @@
             {"tool_id": "TOOL001", "quantity": 1}
         ],
         "required_materials": [
-            {"material_id": "MAT002", "quantity": 5}
+            {"material_id": "MAT002", "quantity": 500}
         ],
         "precedence": ["JOB001"]
     },

@@ -1087,47 +1087,50 @@ def optimize():
         algorithm = request.form.get('algorithm')
         initial_schedule = load_data(SCHEDULE_FILE)
         start_time = time.time()
-        
-        if algorithm == 'MILP':
-            from src.optimiser_milp import optimize_schedule as optimize_milp
-            try:
-                optimized_schedule = optimize_milp()
-                flash('Optimization with MILP completed successfully!', 'success')
-            except Exception as e:
-                flash(f'Optimization failed: {str(e)}', 'danger')
-                return redirect(url_for('optimize'))
-        elif algorithm == 'GA':
-            from src.optimiser_ga import optimize_schedule as optimize_ga
-            try:
-                optimized_schedule = optimize_ga()
-                flash('Optimization with Genetic Algorithm completed successfully!', 'success')
-            except Exception as e:
-                flash(f'Optimization failed: {str(e)}', 'danger')
-                return redirect(url_for('optimize'))
-        elif algorithm == 'ORTOOLS':
-           from src.optimiser_ortools import optimize_schedule as optimize_ortools
-           try:
-                optimized_schedule = optimize_ortools()
-                flash('Optimization with Google OR-Tools completed successfully!', 'success')
-           except Exception as e:
-                flash(f'Optimization failed: {str(e)}', 'danger')
-                return redirect(url_for('optimize'))
 
-        elif algorithm == 'SA':
-            # To uncomment when Simulated Annealing optimization is implemented
-            from src.optimiser_sa import optimize_schedule as optimize_sa
-            try:
-                optimized_schedule = optimize_sa()
-                flash('Optimization with Simulated Annealing algorithm completed successfully!', 'success')
-            except Exception as e:
-                flash(f'Optimization failed: {str(e)}', 'danger')
-            # flash('Simulated Annealing optimization algorithm is not yet implemented.', 'warning') # comment out after implementing SA
-        else:
-            flash('Invalid optimization algorithm selected.', 'danger')
+        try:
+            if algorithm == 'MILP':
+                from src.optimiser_milp import optimize_schedule as optimizer
+            elif algorithm == 'GA':
+                from src.optimiser_ga import optimize_schedule as optimizer
+            elif algorithm == 'ORTOOLS':
+                from src.optimiser_ortools import optimize_schedule as optimizer
+            elif algorithm == 'SA':
+                from src.optimiser_sa import optimize_schedule as optimizer
+            else:
+                flash('Invalid optimization algorithm selected.', 'danger')
+                return redirect(url_for('optimize'))
+        except Exception as e:
+            flash(f"Error loading optimizer: {str(e)}", "danger")
             return redirect(url_for('optimize'))
 
+        try:
+            optimized_schedule = optimizer()
+        except Exception as e:
+            flash(f'Optimization failed: {str(e)}', 'danger')
+            return redirect(url_for('optimize'))
+
+        # Determine result and flash appropriate message
+        unscheduled_path = os.path.join(DATA_DIR, f'unscheduled_jobs_{algorithm.lower()}.json')
+        unscheduled_jobs = []
+        if os.path.exists(unscheduled_path):
+            with open(unscheduled_path, 'r') as f:
+                unscheduled_jobs = json.load(f)
+
+        if not optimized_schedule or (isinstance(optimized_schedule, list) and len(optimized_schedule) == 0):
+            if unscheduled_jobs:
+                unscheduled_msgs = [f"{j['job_id']} ({', '.join(j['reason'])})" for j in unscheduled_jobs]
+                flash(f"No jobs could be scheduled. Unscheduled jobs: {', '.join(unscheduled_msgs)}", "danger")
+            else:
+                flash("No jobs could be scheduled. Please check resource constraints.", "danger")
+        elif unscheduled_jobs:
+            unscheduled_msgs = [f"{j['job_id']} ({', '.join(j['reason'])})" for j in unscheduled_jobs]
+            flash(f"Some jobs could not be scheduled: {', '.join(unscheduled_msgs)}", 'warning')
+            flash(f'Optimization with {algorithm} completed successfully for feasible jobs!', 'success')
+        else:
+            flash(f'Optimization with {algorithm} completed successfully!', 'success')
+
         end_time = time.time()
-        start_time = time.time()
         optimization_time = end_time - start_time
 
         # Save the optimized schedule
