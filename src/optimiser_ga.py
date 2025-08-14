@@ -1,231 +1,8 @@
-# import sys, os, random, datetime, json
-# from typing import List, Dict, Any, Tuple
-# import numpy as np
-
-# # Add the root directory to the system path
-# PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# sys.path.append(PROJECT_ROOT)
-
-# from src.data_handler import load_and_validate_data   
-# from src.email_sender import notify_technicians
-
-
-# # Data paths
-# DATA_DIR = 'data'
-
-# # Constants
-# POPULATION_SIZE = 100
-# GENERATIONS = 100
-# MUTATION_RATE = 0.1
-# CROSSOVER_RATE = 0.8
-
-# # Define working hours
-# WORKDAY_START = datetime.time(8, 0)
-# WORKDAY_END = datetime.time(17, 0)
-# WORKDAYS = {0, 1, 2, 3, 4}  # Monday to Friday
-
-# class GeneticAlgorithm:
-#     def __init__(self, data: Dict[str, Any]):
-#         self.jobs = data['jobs']
-#         self.technicians = data['technicians']
-#         self.equipment = data['equipment']
-#         self.tools = data['tools']
-#         self.materials = data['materials']
-#         self.t_start = datetime.datetime.strptime(data.get('t_start', '2025-07-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
-#         self.t_end = datetime.datetime.strptime(data.get('t_end', '2025-07-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
-
-#     def is_working_hour(self, dt: datetime.datetime) -> bool:
-#         return dt.weekday() in WORKDAYS and WORKDAY_START <= dt.time() < WORKDAY_END
-
-#     def next_working_hour(self, dt: datetime.datetime) -> datetime.datetime:
-#         while not self.is_working_hour(dt):
-#             dt += datetime.timedelta(hours=1)
-#             if dt.time() < WORKDAY_START:
-#                 dt = dt.replace(hour=WORKDAY_START.hour, minute=WORKDAY_START.minute)
-#             elif dt.time() >= WORKDAY_END:
-#                 dt += datetime.timedelta(days=1)
-#                 dt = dt.replace(hour=WORKDAY_START.hour, minute=WORKDAY_START.minute)
-#         return dt
-
-#     def generate_individual(self) -> List[Dict[str, Any]]:
-#         schedule = []
-#         for job in self.jobs:
-#             start_time = self.next_working_hour(self.t_start + datetime.timedelta(minutes=random.randint(0, int((self.t_end - self.t_start).total_seconds() / 60))))
-#             end_time = start_time + datetime.timedelta(hours=job['duration'])
-            
-#             # Ensure the job ends within working hours and the scheduling window
-#             while not self.is_working_hour(end_time - datetime.timedelta(minutes=1)) or end_time > self.t_end:
-#                 start_time = self.next_working_hour(start_time + datetime.timedelta(hours=1))
-#                 end_time = start_time + datetime.timedelta(hours=job['duration'])
-#                 if start_time >= self.t_end:
-#                     # If we can't fit the job, schedule it at the start of the window
-#                     start_time = self.next_working_hour(self.t_start)
-#                     end_time = start_time + datetime.timedelta(hours=job['duration'])
-            
-#             available_techs = [tech for tech in self.technicians if set(job['required_skills']).issubset(set(tech['skills']))]
-#             assigned_techs = random.sample(available_techs, min(len(available_techs), 2))  # Assign up to 2 technicians
-            
-#             schedule.append({
-#                 'job_id': job['job_id'],
-#                 'equipment_id': job['equipment_id'],
-#                 'scheduled_start_time': start_time,
-#                 'scheduled_end_time': end_time,
-#                 'assigned_technicians': [tech['tech_id'] for tech in assigned_techs]
-#             })
-#         return schedule
-
-#     def fitness(self, individual: List[Dict[str, Any]]) -> float:
-#         total_violation = 0
-#         equipment_usage = {equip['equipment_id']: [] for equip in self.equipment}
-#         technician_usage = {tech['tech_id']: [] for tech in self.technicians}
-#         tool_usage = {tool['tool_id']: 0 for tool in self.tools}
-#         material_usage = {material['material_id']: 0 for material in self.materials}
-        
-#         for job in individual:
-#             # Working hours and scheduling window violation
-#             start_time, end_time = job['scheduled_start_time'], job['scheduled_end_time']
-#             if start_time < self.t_start or end_time > self.t_end:
-#                 total_violation += 1000  # Heavy penalty for being outside scheduling window
-            
-#             current_time = start_time
-#             while current_time < end_time:
-#                 if not self.is_working_hour(current_time):
-#                     total_violation += 1
-#                 current_time += datetime.timedelta(hours=1)
-            
-#             # Other constraints remain the same
-#             equipment_usage[job['equipment_id']].append((start_time, end_time))
-#             for tech_id in job['assigned_technicians']:
-#                 technician_usage[tech_id].append((start_time, end_time))
-            
-#             job_data = next(j for j in self.jobs if j['job_id'] == job['job_id'])
-#             for tool_req in job_data['required_tools']:
-#                 tool_usage[tool_req['tool_id']] += tool_req['quantity']
-#             for material_req in job_data['required_materials']:
-#                 material_usage[material_req['material_id']] += material_req['quantity']
-        
-#         # Check for overlaps in equipment and technician usage
-#         for usage in list(equipment_usage.values()) + list(technician_usage.values()):
-#             usage.sort(key=lambda x: x[0])
-#             for i in range(len(usage) - 1):
-#                 if usage[i][1] > usage[i+1][0]:
-#                     total_violation += 1
-        
-#         # Check for tool and material over-usage
-#         for tool in self.tools:
-#             if tool_usage[tool['tool_id']] > tool['quantity']:
-#                 total_violation += tool_usage[tool['tool_id']] - tool['quantity']
-#         for material in self.materials:
-#             if material_usage[material['material_id']] > material['quantity']:
-#                 total_violation += material_usage[material['material_id']] - material['quantity']
-        
-#         makespan = max(job['scheduled_end_time'] for job in individual) - min(job['scheduled_start_time'] for job in individual)
-        
-#         return 1 / (makespan.total_seconds() / 3600 + total_violation * 100)  # Increased penalty for violations
-
-#     def crossover(self, parent1: List[Dict[str, Any]], parent2: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-#         if random.random() > CROSSOVER_RATE:
-#             return parent1, parent2
-        
-#         crossover_point = random.randint(1, len(parent1) - 1)
-#         child1 = parent1[:crossover_point] + parent2[crossover_point:]
-#         child2 = parent2[:crossover_point] + parent1[crossover_point:]
-#         return child1, child2
-
-#     def mutate(self, individual: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-#         for i in range(len(individual)):
-#             if random.random() < MUTATION_RATE:
-#                 job = individual[i]
-                
-#                 # Mutate start time
-#                 shift = datetime.timedelta(hours=random.randint(-12, 12))
-#                 new_start = self.next_working_hour(job['scheduled_start_time'] + shift)
-#                 new_end = new_start + datetime.timedelta(hours=next(j['duration'] for j in self.jobs if j['job_id'] == job['job_id']))
-                
-#                 # Ensure the job ends within working hours and the scheduling window
-#                 while not self.is_working_hour(new_end - datetime.timedelta(minutes=1)) or new_end > self.t_end:
-#                     new_start = self.next_working_hour(new_start + datetime.timedelta(hours=1))
-#                     new_end = new_start + datetime.timedelta(hours=next(j['duration'] for j in self.jobs if j['job_id'] == job['job_id']))
-#                     if new_start >= self.t_end:
-#                         # If we can't fit the job, schedule it at the start of the window
-#                         new_start = self.next_working_hour(self.t_start)
-#                         new_end = new_start + datetime.timedelta(hours=next(j['duration'] for j in self.jobs if j['job_id'] == job['job_id']))
-                
-#                 job['scheduled_start_time'] = new_start
-#                 job['scheduled_end_time'] = new_end
-                
-#                 # Mutate assigned technicians
-#                 job_data = next(j for j in self.jobs if j['job_id'] == job['job_id'])
-#                 available_techs = [tech for tech in self.technicians if set(job_data['required_skills']).issubset(set(tech['skills']))]
-#                 job['assigned_technicians'] = [tech['tech_id'] for tech in random.sample(available_techs, min(len(available_techs), 2))]
-        
-#         return individual
-
-#     def select_parents(self, population: List[List[Dict[str, Any]]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-#         tournament_size = 5
-#         tournament1 = random.sample(population, tournament_size)
-#         tournament2 = random.sample(population, tournament_size)
-#         parent1 = max(tournament1, key=self.fitness)
-#         parent2 = max(tournament2, key=self.fitness)
-#         return parent1, parent2
-
-#     def optimize(self) -> List[Dict[str, Any]]:
-#         population = [self.generate_individual() for _ in range(POPULATION_SIZE)]
-        
-#         for generation in range(GENERATIONS):
-#             new_population = []
-            
-#             for _ in range(POPULATION_SIZE // 2):
-#                 parent1, parent2 = self.select_parents(population)
-#                 child1, child2 = self.crossover(parent1, parent2)
-#                 new_population.extend([self.mutate(child1), self.mutate(child2)])
-            
-#             population = new_population
-            
-#             best_individual = max(population, key=self.fitness)
-#             best_fitness = self.fitness(best_individual)
-            
-#             print(f"Generation {generation + 1}: Best Fitness = {best_fitness}")
-        
-#         return best_individual
-
-# def save_optimized_schedule(schedule, optimizer_name):
-#     filename = f'optimized_schedule_{optimizer_name.lower()}.json'
-#     filepath = os.path.join(DATA_DIR, filename)
-#     with open(filepath, 'w') as f:
-#         json.dump(schedule, f, indent=4)
-#     print(f"\nOptimized schedule saved to {filepath}")
-
-# def optimize_schedule():
-#     data = load_and_validate_data()
-#     ga = GeneticAlgorithm(data)
-#     best_schedule = ga.optimize()
-    
-#     # Convert datetime objects to string for JSON serialization
-#     for job in best_schedule:
-#         job['scheduled_start_time'] = job['scheduled_start_time'].strftime('%Y-%m-%dT%H:%M:%S')
-#         job['scheduled_end_time'] = job['scheduled_end_time'].strftime('%Y-%m-%dT%H:%M:%S')
-    
-#     # Save the optimized schedule
-#     save_optimized_schedule(best_schedule, "GA")
-#     # notify_technicians(best_schedule, data['technicians'])
-   
-    
-#     print("Optimization complete. Schedule saved to 'optimized_schedule.json'.")
-#     return best_schedule
-
-# if __name__ == "__main__":
-#     optimize_schedule()
-
-
-
-
-
 import sys, os, random, datetime, json
 from typing import List, Dict, Any, Tuple
 import numpy as np
 
-# Add the root directory to the system path
+# Add the project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PROJECT_ROOT)
 
@@ -239,16 +16,172 @@ GENERATIONS = 100
 MUTATION_RATE = 0.1
 CROSSOVER_RATE = 0.8
 
+# ===== Working hours (single-day, no splitting) =====
 WORKDAY_START = datetime.time(8, 0)
-WORKDAY_END = datetime.time(17, 0)
-WORKDAYS = {0, 1, 2, 3, 4}  # Monday to Friday
+WORKDAY_END   = datetime.time(17, 0)
+WORKDAYS = {0, 1, 2, 3, 4}  # Monday–Friday
 
 def save_optimized_schedule(schedule, optimizer_name):
+    os.makedirs(DATA_DIR, exist_ok=True)
     filename = f'optimized_schedule_{optimizer_name.lower()}.json'
     filepath = os.path.join(DATA_DIR, filename)
     with open(filepath, 'w') as f:
-        json.dump(schedule, f, indent=4)
-    print(f"\nOptimized schedule saved to {filepath}")
+        json.dump(schedule, f, indent=4, default=str)
+    print(f"\n✅ Optimized schedule saved to {filepath}")
+
+def daily_work_hours() -> float:
+    return (
+        datetime.datetime.combine(datetime.date(2000, 1, 1), WORKDAY_END)
+        - datetime.datetime.combine(datetime.date(2000, 1, 1), WORKDAY_START)
+    ).total_seconds() / 3600.0
+
+# ===== GA Implementation =====
+
+class GeneticAlgorithm:
+    def __init__(self, jobs, techs, equip, tools, mats, t_start, t_end):
+        self.jobs = jobs
+        self.technicians = techs
+        self.equipment = equip
+        self.tools = tools
+        self.materials = mats
+        self.t_start = t_start
+        self.t_end = t_end
+
+    def is_working_hour(self, dt: datetime.datetime) -> bool:
+        return dt.weekday() in WORKDAYS and WORKDAY_START <= dt.time() < WORKDAY_END
+
+    def next_working_hour(self, dt: datetime.datetime) -> datetime.datetime:
+        while not self.is_working_hour(dt):
+            dt += datetime.timedelta(hours=1)
+            if dt.time() < WORKDAY_START:
+                dt = dt.replace(hour=WORKDAY_START.hour, minute=WORKDAY_START.minute)
+            elif dt.time() >= WORKDAY_END:
+                dt += datetime.timedelta(days=1)
+                dt = dt.replace(hour=WORKDAY_START.hour, minute=WORKDAY_START.minute)
+        return dt
+
+    def generate_individual(self) -> List[Dict[str, Any]]:
+        schedule = []
+        for job in self.jobs:
+            start_time = self.next_working_hour(
+                self.t_start + datetime.timedelta(minutes=random.randint(0, int((self.t_end - self.t_start).total_seconds() / 60)))
+            )
+            end_time = start_time + datetime.timedelta(hours=float(job['duration']))
+
+            # Keep sliding until the job fits fully inside a workday and global window
+            while not self.is_working_hour(end_time - datetime.timedelta(minutes=1)) or end_time > self.t_end:
+                start_time = self.next_working_hour(start_time + datetime.timedelta(hours=1))
+                end_time = start_time + datetime.timedelta(hours=float(job['duration']))
+                if start_time >= self.t_end:
+                    # fallback: place at earliest working hour possible
+                    start_time = self.next_working_hour(self.t_start)
+                    end_time = start_time + datetime.timedelta(hours=float(job['duration']))
+
+            eligible = [t for t in self.technicians if set(job.get('required_skills', [])) <= set(t.get('skills', []))]
+            assigned = random.sample(eligible, min(len(eligible), 2)) if eligible else []
+            schedule.append({
+                'job_id': job['job_id'],
+                'equipment_id': job['equipment_id'],
+                'scheduled_start_time': start_time,
+                'scheduled_end_time': end_time,
+                'assigned_technicians': [t['tech_id'] for t in assigned]
+            })
+        return schedule
+
+    def fitness(self, individual: List[Dict[str, Any]]) -> float:
+        total_violation = 0
+        equipment_usage = {e['equipment_id']: [] for e in self.equipment}
+        technician_usage = {t['tech_id']: [] for t in self.technicians}
+        tool_usage = {tool['tool_id']: 0 for tool in self.tools}
+        material_usage = {m['material_id']: 0 for m in self.materials}
+
+        for job in individual:
+            s, e = job['scheduled_start_time'], job['scheduled_end_time']
+            if s < self.t_start or e > self.t_end:
+                total_violation += 1000
+
+            cur = s
+            while cur < e:
+                if not self.is_working_hour(cur):
+                    total_violation += 1
+                cur += datetime.timedelta(hours=1)
+
+            equipment_usage[job['equipment_id']].append((s, e))
+            for tech_id in job['assigned_technicians']:
+                technician_usage[tech_id].append((s, e))
+
+            job_data = next(j for j in self.jobs if j['job_id'] == job['job_id'])
+            for req in job_data.get('required_tools', []):
+                tool_usage[req['tool_id']] += int(req['quantity'])
+            for req in job_data.get('required_materials', []):
+                material_usage[req['material_id']] += int(req['quantity'])
+
+        # Overlaps
+        def has_overlap(arr):
+            arr.sort(key=lambda x: x[0])
+            return any(arr[i][1] > arr[i+1][0] for i in range(len(arr)-1))
+
+        for lst in list(equipment_usage.values()) + list(technician_usage.values()):
+            if has_overlap(lst):
+                total_violation += 1
+
+        # resource caps
+        for tool in self.tools:
+            if tool_usage[tool['tool_id']] > int(tool['quantity']):
+                total_violation += tool_usage[tool['tool_id']] - int(tool['quantity'])
+        for mat in self.materials:
+            if material_usage[mat['material_id']] > int(mat['quantity']):
+                total_violation += material_usage[mat['material_id']] - int(mat['quantity'])
+
+        makespan = max(j['scheduled_end_time'] for j in individual) - min(j['scheduled_start_time'] for j in individual)
+        # Higher fitness is better
+        return 1.0 / (makespan.total_seconds() / 3600.0 + total_violation * 100.0)
+
+    def crossover(self, p1, p2):
+        if random.random() > CROSSOVER_RATE:
+            return p1, p2
+        cut = random.randint(1, len(p1) - 1)
+        return p1[:cut] + p2[cut:], p2[:cut] + p1[cut:]
+
+    def mutate(self, individual):
+        for i in range(len(individual)):
+            if random.random() < MUTATION_RATE:
+                job_sched = individual[i]
+                job_data = next(j for j in self.jobs if j['job_id'] == job_sched['job_id'])
+                dur = float(job_data['duration'])
+                shift = datetime.timedelta(hours=random.randint(-12, 12))
+                new_start = self.next_working_hour(job_sched['scheduled_start_time'] + shift)
+                new_end = new_start + datetime.timedelta(hours=dur)
+                while not self.is_working_hour(new_end - datetime.timedelta(minutes=1)) or new_end > self.t_end:
+                    new_start = self.next_working_hour(new_start + datetime.timedelta(hours=1))
+                    new_end = new_start + datetime.timedelta(hours=dur)
+                    if new_start >= self.t_end:
+                        new_start = self.next_working_hour(self.t_start)
+                        new_end = new_start + datetime.timedelta(hours=dur)
+                job_sched['scheduled_start_time'] = new_start
+                job_sched['scheduled_end_time'] = new_end
+
+                eligible = [t for t in self.technicians if set(job_data.get('required_skills', [])) <= set(t.get('skills', []))]
+                job_sched['assigned_technicians'] = [t['tech_id'] for t in random.sample(eligible, min(2, len(eligible)))] if eligible else []
+        return individual
+
+    def select_parents(self, population):
+        k = 5
+        t1, t2 = random.sample(population, k), random.sample(population, k)
+        return max(t1, key=self.fitness), max(t2, key=self.fitness)
+
+    def optimize(self):
+        population = [self.generate_individual() for _ in range(POPULATION_SIZE)]
+        for g in range(GENERATIONS):
+            new_pop = []
+            for _ in range(POPULATION_SIZE // 2):
+                p1, p2 = self.select_parents(population)
+                c1, c2 = self.crossover(p1, p2)
+                new_pop.extend([self.mutate(c1), self.mutate(c2)])
+            population = new_pop
+            best = max(population, key=self.fitness)
+            print(f"Generation {g + 1}: Best Fitness = {self.fitness(best)}")
+        return max(population, key=self.fitness)
 
 def optimize_schedule():
     data = load_and_validate_data()
@@ -258,28 +191,41 @@ def optimize_schedule():
     tools = data['tools']
     mats = data['materials']
     t_start = datetime.datetime.strptime(data.get('t_start', '2025-07-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
-    t_end = datetime.datetime.strptime(data.get('t_end', '2025-07-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
+    t_end   = datetime.datetime.strptime(data.get('t_end',   '2025-07-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
 
-    # === Resource and Skill Precheck ===
-    tool_caps = {tool['tool_id']: tool['quantity'] for tool in tools}
-    mat_caps = {mat['material_id']: mat['quantity'] for mat in mats}
+    # ===== Precheck: resources, skills, and working-hours duration =====
+    tool_caps = {tool['tool_id']: int(tool['quantity']) for tool in tools}
+    mat_caps  = {m['material_id']: int(m['quantity']) for m in mats}
+    day_len   = daily_work_hours()
+
     unscheduled = []
     feasible_jobs = []
     for job in jobs:
         reasons = []
-        for req in job['required_tools']:
+        # tools
+        for req in job.get('required_tools', []):
             avail = tool_caps.get(req['tool_id'], 0)
-            if req['quantity'] > avail:
+            if int(req['quantity']) > avail:
                 reasons.append(f"Needs {req['quantity']} of tool {req['tool_id']}, only {avail} available.")
-        for req in job['required_materials']:
+        # materials
+        for req in job.get('required_materials', []):
             avail = mat_caps.get(req['material_id'], 0)
-            if req['quantity'] > avail:
+            if int(req['quantity']) > avail:
                 reasons.append(f"Needs {req['quantity']} of material {req['material_id']}, only {avail} available.")
-        available_techs = [tech for tech in techs if set(job['required_skills']).issubset(set(tech['skills']))]
-        if not available_techs:
+        # skills
+        eligible = [t for t in techs if set(job.get('required_skills', [])) <= set(t.get('skills', []))]
+        if not eligible:
             reasons.append("No matching technicians with required skills.")
+        # working-hours duration (no split)
+        dur = float(job.get('duration', 0))
+        if dur > day_len:
+            reasons.append(
+                f"Duration {dur}h exceeds workday length {int(day_len)}h "
+                f"({WORKDAY_START.strftime('%H:%M')}-{WORKDAY_END.strftime('%H:%M')})."
+            )
+
         if reasons:
-            unscheduled.append({"job_id": job['job_id'], "reason": reasons})
+            unscheduled.append({"job_id": job["job_id"], "reason": reasons})
         else:
             feasible_jobs.append(job)
 
@@ -287,173 +233,34 @@ def optimize_schedule():
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(os.path.join(DATA_DIR, "unscheduled_jobs_ga.json"), "w") as f:
             json.dump(unscheduled, f, indent=4)
-        print("⚠️ The following jobs were removed due to impossible resource requirements or missing skills:")
+        print("⚠️ Some jobs were moved to unscheduled due to constraints:")
         for item in unscheduled:
-            print(f"- Job {item['job_id']}: {', '.join(item['reason'])}")
+            print(f"   • {item['job_id']}: {', '.join(item['reason'])}")
 
     if not feasible_jobs:
-        print("No feasible jobs remain after pre-checks. Optimization not attempted.")
+        print("❌ No feasible jobs remain after pre-checks. Optimization not attempted.")
         save_optimized_schedule([], 'GA')
         return []
 
-    # --------- GA logic (slightly refactored to use feasible_jobs) ----------
-
-    class GeneticAlgorithm:
-        def __init__(self, jobs, techs, equip, tools, mats, t_start, t_end):
-            self.jobs = jobs
-            self.technicians = techs
-            self.equipment = equip
-            self.tools = tools
-            self.materials = mats
-            self.t_start = t_start
-            self.t_end = t_end
-
-        def is_working_hour(self, dt: datetime.datetime) -> bool:
-            return dt.weekday() in WORKDAYS and WORKDAY_START <= dt.time() < WORKDAY_END
-
-        def next_working_hour(self, dt: datetime.datetime) -> datetime.datetime:
-            while not self.is_working_hour(dt):
-                dt += datetime.timedelta(hours=1)
-                if dt.time() < WORKDAY_START:
-                    dt = dt.replace(hour=WORKDAY_START.hour, minute=WORKDAY_START.minute)
-                elif dt.time() >= WORKDAY_END:
-                    dt += datetime.timedelta(days=1)
-                    dt = dt.replace(hour=WORKDAY_START.hour, minute=WORKDAY_START.minute)
-            return dt
-
-        def generate_individual(self) -> List[Dict[str, Any]]:
-            schedule = []
-            for job in self.jobs:
-                start_time = self.next_working_hour(self.t_start + datetime.timedelta(
-                    minutes=random.randint(0, int((self.t_end - self.t_start).total_seconds() / 60))))
-                end_time = start_time + datetime.timedelta(hours=job['duration'])
-                while not self.is_working_hour(end_time - datetime.timedelta(minutes=1)) or end_time > self.t_end:
-                    start_time = self.next_working_hour(start_time + datetime.timedelta(hours=1))
-                    end_time = start_time + datetime.timedelta(hours=job['duration'])
-                    if start_time >= self.t_end:
-                        start_time = self.next_working_hour(self.t_start)
-                        end_time = start_time + datetime.timedelta(hours=job['duration'])
-                available_techs = [tech for tech in self.technicians if set(job['required_skills']).issubset(set(tech['skills']))]
-                assigned_techs = random.sample(available_techs, min(len(available_techs), 2))
-                schedule.append({
-                    'job_id': job['job_id'],
-                    'equipment_id': job['equipment_id'],
-                    'scheduled_start_time': start_time,
-                    'scheduled_end_time': end_time,
-                    'assigned_technicians': [tech['tech_id'] for tech in assigned_techs]
-                })
-            return schedule
-
-        def fitness(self, individual: List[Dict[str, Any]]) -> float:
-            total_violation = 0
-            equipment_usage = {equip['equipment_id']: [] for equip in self.equipment}
-            technician_usage = {tech['tech_id']: [] for tech in self.technicians}
-            tool_usage = {tool['tool_id']: 0 for tool in self.tools}
-            material_usage = {material['material_id']: 0 for material in self.materials}
-            for job in individual:
-                start_time, end_time = job['scheduled_start_time'], job['scheduled_end_time']
-                if start_time < self.t_start or end_time > self.t_end:
-                    total_violation += 1000
-                current_time = start_time
-                while current_time < end_time:
-                    if not self.is_working_hour(current_time):
-                        total_violation += 1
-                    current_time += datetime.timedelta(hours=1)
-                equipment_usage[job['equipment_id']].append((start_time, end_time))
-                for tech_id in job['assigned_technicians']:
-                    technician_usage[tech_id].append((start_time, end_time))
-                job_data = next(j for j in self.jobs if j['job_id'] == job['job_id'])
-                for tool_req in job_data['required_tools']:
-                    tool_usage[tool_req['tool_id']] += tool_req['quantity']
-                for material_req in job_data['required_materials']:
-                    material_usage[material_req['material_id']] += material_req['quantity']
-            for usage in list(equipment_usage.values()) + list(technician_usage.values()):
-                usage.sort(key=lambda x: x[0])
-                for i in range(len(usage) - 1):
-                    if usage[i][1] > usage[i + 1][0]:
-                        total_violation += 1
-            for tool in self.tools:
-                if tool_usage[tool['tool_id']] > tool['quantity']:
-                    total_violation += tool_usage[tool['tool_id']] - tool['quantity']
-            for material in self.materials:
-                if material_usage[material['material_id']] > material['quantity']:
-                    total_violation += material_usage[material['material_id']] - material['quantity']
-            makespan = max(job['scheduled_end_time'] for job in individual) - min(job['scheduled_start_time'] for job in individual)
-            return 1 / (makespan.total_seconds() / 3600 + total_violation * 100)
-
-        def crossover(self, parent1, parent2):
-            if random.random() > CROSSOVER_RATE:
-                return parent1, parent2
-            crossover_point = random.randint(1, len(parent1) - 1)
-            child1 = parent1[:crossover_point] + parent2[crossover_point:]
-            child2 = parent2[:crossover_point] + parent1[crossover_point:]
-            return child1, child2
-
-        def mutate(self, individual):
-            for i in range(len(individual)):
-                if random.random() < MUTATION_RATE:
-                    job = individual[i]
-                    shift = datetime.timedelta(hours=random.randint(-12, 12))
-                    new_start = self.next_working_hour(job['scheduled_start_time'] + shift)
-                    new_end = new_start + datetime.timedelta(hours=next(j['duration'] for j in self.jobs if j['job_id'] == job['job_id']))
-                    while not self.is_working_hour(new_end - datetime.timedelta(minutes=1)) or new_end > self.t_end:
-                        new_start = self.next_working_hour(new_start + datetime.timedelta(hours=1))
-                        new_end = new_start + datetime.timedelta(hours=next(j['duration'] for j in self.jobs if j['job_id'] == job['job_id']))
-                        if new_start >= self.t_end:
-                            new_start = self.next_working_hour(self.t_start)
-                            new_end = new_start + datetime.timedelta(hours=next(j['duration'] for j in self.jobs if j['job_id'] == job['job_id']))
-                    job['scheduled_start_time'] = new_start
-                    job['scheduled_end_time'] = new_end
-                    job_data = next(j for j in self.jobs if j['job_id'] == job['job_id'])
-                    available_techs = [tech for tech in self.technicians if set(job_data['required_skills']).issubset(set(tech['skills']))]
-                    job['assigned_technicians'] = [tech['tech_id'] for tech in random.sample(available_techs, min(len(available_techs), 2))]
-            return individual
-
-        def select_parents(self, population):
-            tournament_size = 5
-            tournament1 = random.sample(population, tournament_size)
-            tournament2 = random.sample(population, tournament_size)
-            parent1 = max(tournament1, key=self.fitness)
-            parent2 = max(tournament2, key=self.fitness)
-            return parent1, parent2
-
-        def optimize(self):
-            population = [self.generate_individual() for _ in range(POPULATION_SIZE)]
-            for generation in range(GENERATIONS):
-                new_population = []
-                for _ in range(POPULATION_SIZE // 2):
-                    parent1, parent2 = self.select_parents(population)
-                    child1, child2 = self.crossover(parent1, parent2)
-                    new_population.extend([self.mutate(child1), self.mutate(child2)])
-                population = new_population
-                best_individual = max(population, key=self.fitness)
-                best_fitness = self.fitness(best_individual)
-                print(f"Generation {generation + 1}: Best Fitness = {best_fitness}")
-            return best_individual
-
-    # Run GA optimizer only on feasible jobs
+    # ===== Run GA on feasible jobs only =====
     ga = GeneticAlgorithm(feasible_jobs, techs, equip, tools, mats, t_start, t_end)
     best_schedule = ga.optimize()
-    # Convert datetime to string for JSON
-    for job in best_schedule:
-        job['scheduled_start_time'] = job['scheduled_start_time'].strftime('%Y-%m-%dT%H:%M:%S')
-        job['scheduled_end_time'] = job['scheduled_end_time'].strftime('%Y-%m-%dT%H:%M:%S')
+
+    # Convert datetimes for JSON
+    for j in best_schedule:
+        j['scheduled_start_time'] = j['scheduled_start_time'].strftime('%Y-%m-%dT%H:%M:%S')
+        j['scheduled_end_time']   = j['scheduled_end_time'].strftime('%Y-%m-%dT%H:%M:%S')
+
     save_optimized_schedule(best_schedule, "GA")
 
-    # Print summary
-    scheduled_job_ids = [job['job_id'] for job in best_schedule]
-    unscheduled_ids = [item['job_id'] for item in unscheduled]
-    print("\n=== Scheduling Statistics ===")
-    print(f"Total jobs: {len(jobs)}")
-    print(f"Scheduled jobs: {len(scheduled_job_ids)}")
-    print(f"Unscheduled jobs: {len(unscheduled_ids)}")
-    if unscheduled_ids:
-        print("Unscheduled jobs and reasons:")
-        for item in unscheduled:
-            print(f"- {item['job_id']}: {', '.join(item['reason'])}")
-    if best_schedule:
-        print(f"Scheduling rate: {len(scheduled_job_ids)/len(jobs)*100:.2f}%")
-    print("\nOptimization with Genetic Algorithm completed.")
+    # stats
+    print("\n=== Scheduling Statistics (GA) ===")
+    print(f"  - Total jobs:     {len(jobs)}")
+    print(f"  - Scheduled jobs: {len(best_schedule)}")
+    print(f"  - Unscheduled:    {len(unscheduled)}")
+    if unscheduled:
+        for u in unscheduled:
+            print(f"    · {u['job_id']}: {', '.join(u['reason'])}")
 
     return best_schedule
 

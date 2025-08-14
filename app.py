@@ -1,32 +1,22 @@
 # app.py
 
 from flask import (
-    Flask, Response, render_template, request, redirect, url_for, 
+    Flask, render_template, request, redirect, url_for,
     flash, jsonify, send_from_directory, current_app, session
 )
-from flask_wtf import FlaskForm
-from wtforms import (
-    StringField, IntegerField, SelectField, SelectMultipleField, 
-    FieldList, FormField, SubmitField, FloatField, TextAreaField
-)
-from wtforms.validators import DataRequired, NumberRange
-from werkzeug.utils import secure_filename
-from sqlalchemy.orm import joinedload, subqueryload
-from sqlalchemy import text
 from flask_migrate import Migrate
-from io import TextIOWrapper
+from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy import text ,inspect # keep if you still use raw SQL in some routes
 
 import plotly
 import plotly.figure_factory as ff
-import json
-import os
-import datetime
-import time
-import csv
-import io
+import json, os, datetime, time, csv, io
+from werkzeug.utils import secure_filename  # keep if you use file uploads
 
+# Pre-check
+from src.precheck import precheck_jobs
 
-# Import scheduler and metrics functions
+# Optimizer plumbing you already had
 from src.scheduler import Scheduler
 from src.data_handler import load_and_validate_data
 from src.metrics import (
@@ -44,149 +34,38 @@ from src.metrics import (
     generate_visualizations
 )
 
-# database configurations
-from flask_sqlalchemy import SQLAlchemy
+# Config
 from config import (
     SQLALCHEMY_DATABASE_URI,
     SQLALCHEMY_TRACK_MODIFICATIONS,
     UPLOAD_FOLDER
 )
 
-# Initialize Flask app
+# >>> DB models & WTForms (DB-first CRUD)
+from src.models import (
+    db, Job, Equipment, Skill, Tool, Material,
+    Technician, TechnicianSkill, JobSkill, JobTool, JobMaterial, JobPrecedence
+)
+from src.forms import (
+    JobForm, TechnicianForm, EquipmentForm, SkillForm,
+    ToolForm, MaterialForm
+)
+
+# ---- App setup
 app = Flask(__name__)
-app.secret_key = 'secret_key'  # To replace with secure key in production
+app.secret_key = 'secret_key'  # replace in prod
 
-
-# Load configuration from config.py
 app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
 
-# Ensure the upload folder exists and configure it
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_FOLDER)
 
-# Initialize SQLAlchemy
-db = SQLAlchemy(app)
-migrate = Migrate(app, db) 
+# IMPORTANT: init the db from src.models (do NOT create a new SQLAlchemy instance here)
+db.init_app(app)
+migrate = Migrate(app, db)
 
-# -------------------------------------------------------------------------------------------------------------------------
-#  Models for jobs
-# -------------------------------------------------------------------------------------------------------------------------
-
-
-class Job(db.Model):
-    __tablename__ = 'jobs'
-    
-    job_id = db.Column(db.String(10), primary_key=True)
-    description = db.Column(db.Text, nullable=False)
-    duration = db.Column(db.Integer, nullable=False)
-    equipment_id = db.Column(db.String(10), db.ForeignKey('equipment.equipment_id'), nullable=False)
-    
-    # Relationships
-    equipment = db.relationship('Equipment', backref='jobs')
-    skills = db.relationship('JobSkill', backref='job', cascade='all, delete-orphan')
-    tools = db.relationship('JobTool', backref='job', cascade='all, delete-orphan')
-    materials = db.relationship('JobMaterial', backref='job', cascade='all, delete-orphan')
-    
-    # Updated with cascade rules (critical change)
-    precedes = db.relationship('JobPrecedence',
-                             foreign_keys='JobPrecedence.job_id',
-                             backref='job',
-                             cascade='all, delete-orphan',
-                             passive_deletes=True)
-    
-    preceded_by = db.relationship('JobPrecedence',
-                                foreign_keys='JobPrecedence.precedes_job_id',
-                                backref='precedes_job',
-                                cascade='all, delete-orphan',
-                                passive_deletes=True)
-
-class JobSkill(db.Model):
-    __tablename__ = 'jobs_skills'
-    
-    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
-    skill = db.Column(db.String(50), primary_key=True)
-
-class JobTool(db.Model):
-    __tablename__ = 'jobs_tools'
-    
-    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
-    tool_id = db.Column(db.String(10), primary_key=True)
-    quantity = db.Column(db.Integer, nullable=False)
-
-class JobMaterial(db.Model):
-    __tablename__ = 'jobs_materials'
-    
-    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
-    material_id = db.Column(db.String(10), primary_key=True)
-    quantity = db.Column(db.Integer, nullable=False)
-
-class JobPrecedence(db.Model):
-    __tablename__ = 'jobs_precedence'
-    
-    job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
-    precedes_job_id = db.Column(db.String(10), db.ForeignKey('jobs.job_id'), primary_key=True)
-
-# Reference tables (must exist for validation)
-class Equipment(db.Model):
-    __tablename__ = 'equipment'
-    equipment_id = db.Column(db.String(10), primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    priority = db.Column(db.Integer)
-
-class Skill(db.Model):
-    __tablename__ = 'skills'
-    skill = db.Column(db.String(50), primary_key=True)
-
-class Tool(db.Model):
-    __tablename__ = 'tools'
-    tool_id = db.Column(db.String(10), primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    quantity = db.Column(db.Integer)
-
-class Material(db.Model):
-    __tablename__ = 'materials'
-    material_id = db.Column(db.String(10), primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    quantity = db.Column(db.Integer)
-
-
-class Technician(db.Model):
-    __tablename__ = 'technicians'
-    
-    tech_id = db.Column(db.String(10), primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    
-    phone_number = db.Column(db.String(20), nullable=True)  
-    email = db.Column(db.String(100), nullable=True)        
-
-    hourly_rate = db.Column(db.Float)
-
-    # Relationships
-    skills = db.relationship('TechnicianSkill', 
-                             backref='technician',
-                             cascade='all, delete-orphan')
-
-
-class TechnicianSkill(db.Model):
-    __tablename__ = 'technician_skills'
-    
-    tech_id = db.Column(db.String(10), 
-                      db.ForeignKey('technicians.tech_id', ondelete='CASCADE'),
-                      primary_key=True)
-    skill = db.Column(db.String(50), primary_key=True)  # Skills stored as strings
-
-   
-
-# Create all tables
-with app.app_context():
-    db.create_all()
-
-
-
-
-######################End of models ###########################
-
+#*///////////////////////////////////////////////////////////////////////////////
 # Data paths
 DATA_DIR = 'data'
 JOBS_FILE = os.path.join(DATA_DIR, 'jobs.json')
@@ -205,6 +84,25 @@ def load_data(file_path):
 def save_data(data, file_path):
     with open(file_path, 'w') as f:
         json.dump(data, f, indent=4, default=str)
+#*//////////////////////////////////////////////////////////////////#*///////////
+def safe_commit():
+    try:
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print("DB COMMIT FAILED:", e)
+        traceback.print_exc()
+        flash(f"Database error: {e}", "danger")
+        return False
+
+def flash_form_errors(form, header="Please fix the errors below"):
+    if form.errors:
+        flash(header, "warning")
+        for field, errors in form.errors.items():
+            for err in errors:
+                flash(f"{field}: {err}", "danger")
+#*/////////////////////////////////////////////////////////////////////////*///*/////
 
 # Function to run the scheduler and generate schedule and metrics
 def run_scheduler():
@@ -242,175 +140,761 @@ def run_scheduler():
     # Generate visualizations
     generate_visualizations(scheduler)
 
+
+# =========================
+# Helpers to build choices
+# =========================
+def _choices_equipment():
+    return [(e.equipment_id, f"{e.equipment_id} — {e.name}") for e in Equipment.query.order_by(Equipment.equipment_id)]
+
+def _choices_skills():
+    return [(s.skill, s.skill) for s in Skill.query.order_by(Skill.skill)]
+
+def _choices_tools():
+    return [(t.tool_id, f"{t.tool_id} — {t.name}") for t in Tool.query.order_by(Tool.tool_id)]
+
+def _choices_materials():
+    return [(m.material_id, f"{m.material_id} — {m.name}") for m in Material.query.order_by(Material.material_id)]
+
+def _choices_jobs(exclude_id=None):
+    q = Job.query.order_by(Job.job_id)
+    if exclude_id:
+        q = q.filter(Job.job_id != exclude_id)
+    return [(j.job_id, j.job_id) for j in q]
+
 # Routes and views
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# ----------------------------
-# Tool Management Routes
-# ----------------------------
 
-class ToolRequirementForm(FlaskForm):
-    tool_id = SelectField('Tool', validators=[DataRequired()])
-    quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Equipments Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+# =========================
+# Equipment CRUD (DB)
+# =========================
+@app.route('/equipments')
+def view_equipments():
+    equipments = Equipment.query.order_by(Equipment.equipment_id).all()
+    return render_template("equipments/equipments.html", equipments=equipments)
+
+@app.route('/equipments/add', methods=['GET', 'POST'])
+def add_equipment():
+    form = EquipmentForm()
+    if form.validate_on_submit():
+        if Equipment.query.get(form.equipment_id.data):
+            flash("Equipment ID already exists.", "warning")
+            return render_template("equipments/add_equipment.html", form=form)
+        e = Equipment(
+            equipment_id=form.equipment_id.data,
+            name=form.name.data,
+            priority=form.priority.data
+        )
+        db.session.add(e)
+        db.session.commit()
+        flash("Equipment added.", "success")
+        return redirect(url_for('view_equipments'))
+    return render_template("equipments/add_equipment.html", form=form)
+
+@app.route('/equipments/edit/<equipment_id>', methods=['GET', 'POST'])
+def edit_equipment(equipment_id):
+    e = Equipment.query.get_or_404(equipment_id)
+    form = EquipmentForm(obj=e)
+    if form.validate_on_submit():
+        # If ID changed, handle primary key move
+        new_id = form.equipment_id.data
+        if new_id != e.equipment_id and Equipment.query.get(new_id):
+            flash("New Equipment ID already exists.", "warning")
+            return render_template("equipments/edit_equipment.html", form=form, equipment_id=equipment_id)
+        e.equipment_id = new_id
+        e.name = form.name.data
+        e.priority = form.priority.data
+        db.session.commit()
+        flash("Equipment updated.", "success")
+        return redirect(url_for('view_equipments'))
     
-# ----------------------------
-# Materials Management Routes
-# ----------------------------
+    #*//////////////////////////////////////////////////////
+    
+    #*//////////////////////////////////////////////////
+    return render_template("equipments/edit_equipment.html", form=form, equipment_id=equipment_id)
 
-class MaterialRequirementForm(FlaskForm):
-    material_id = SelectField('Material', validators=[DataRequired()])
-    quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
+@app.route('/equipments/delete/<equipment_id>', methods=['POST'])
+def delete_equipment(equipment_id):
+    e = Equipment.query.get_or_404(equipment_id)
+    db.session.delete(e)
+    db.session.commit()
+    flash("Equipment deleted.", "success")
+    return redirect(url_for('view_equipments'))
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Skills Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+# =========================
+# Skills CRUD (DB)
+# =========================
+@app.route('/skills')
+def view_skills():
+    skills = Skill.query.order_by(Skill.skill).all()
+    return render_template('skills/skills.html', skills=skills)
+
+@app.route('/skills/add', methods=['GET', 'POST'])
+def add_skill():
+    form = SkillForm()
+    if form.validate_on_submit():
+        if Skill.query.get(form.skill.data):
+            flash("Skill already exists.", "warning")
+            return render_template('skills/add_skill.html', form=form)
+        s = Skill(skill=form.skill.data)
+        db.session.add(s)
+        db.session.commit()
+        flash("Skill added.", "success")
+        return redirect(url_for('view_skills'))
+    return render_template('skills/add_skill.html', form=form)
+
+@app.route('/skills/edit/<skill>', methods=['GET', 'POST'])
+def edit_skill(skill):
+    s = Skill.query.get_or_404(skill)
+    form = SkillForm(obj=s)
+    if form.validate_on_submit():
+        new_skill = form.skill.data
+        if new_skill != s.skill and Skill.query.get(new_skill):
+            flash("Skill name already exists.", "warning")
+            return render_template('skills/edit_skill.html', form=form, skill=skill)
+        # Update PK by delete+insert to keep it simple
+        db.session.delete(s)
+        db.session.flush()
+        db.session.add(Skill(skill=new_skill))
+        db.session.commit()
+        flash("Skill updated.", "success")
+        return redirect(url_for('view_skills'))
+    return render_template('skills/edit_skill.html', form=form, skill=skill)
+
+@app.route('/skills/delete/<skill>', methods=['POST'])
+def delete_skill(skill):
+    s = Skill.query.get_or_404(skill)
+    db.session.delete(s)
+    db.session.commit()
+    flash("Skill deleted.", "success")
+    return redirect(url_for('view_skills'))
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Tools Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+# =========================
+# Tools CRUD (DB)
+# =========================
+@app.route('/tools')
+def view_tools():
+    tools = Tool.query.order_by(Tool.tool_id).all()
+    return render_template("tools/tools.html", tools=tools)
+
+@app.route('/tools/add', methods=['GET', 'POST'])
+def add_tool():
+    form = ToolForm()
+    if form.validate_on_submit():
+        if Tool.query.get(form.tool_id.data):
+            flash("Tool ID already exists.", "warning")
+            return render_template("tools/add_tool.html", form=form)
+        t = Tool(
+            tool_id=form.tool_id.data,
+            name=form.name.data,
+            quantity=form.quantity.data
+        )
+        db.session.add(t)
+        db.session.commit()
+        flash("Tool added.", "success")
+        return redirect(url_for('view_tools'))
+    return render_template("tools/add_tool.html", form=form)
+
+@app.route('/tools/edit/<tool_id>', methods=['GET', 'POST'])
+def edit_tool(tool_id):
+    t = Tool.query.get_or_404(tool_id)
+    form = ToolForm(obj=t)
+    if form.validate_on_submit():
+        new_id = form.tool_id.data
+        if new_id != t.tool_id and Tool.query.get(new_id):
+            flash("New Tool ID already exists.", "warning")
+            return render_template("tools/edit_tool.html", form=form, tool_id=tool_id)
+        t.tool_id = new_id
+        t.name = form.name.data
+        t.quantity = form.quantity.data
+        db.session.commit()
+        flash("Tool updated.", "success")
+        return redirect(url_for('view_tools'))
+    return render_template("tools/edit_tool.html", form=form, tool_id=tool_id)
+
+@app.route('/tools/delete/<tool_id>', methods=['POST'])
+def delete_tool(tool_id):
+    t = Tool.query.get_or_404(tool_id)
+    db.session.delete(t)
+    db.session.commit()
+    flash("Tool deleted.", "success")
+    return redirect(url_for('view_tools'))
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Materials Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+# =========================
+# Materials CRUD (DB)
+# =========================
+@app.route('/materials')
+def view_materials():
+    materials = Material.query.order_by(Material.material_id).all()
+    return render_template("materials/materials.html", materials=materials)
+
+@app.route('/materials/add', methods=['GET', 'POST'])
+def add_material():
+    form = MaterialForm()
+    if form.validate_on_submit():
+        if Material.query.get(form.material_id.data):
+            flash("Material ID already exists.", "warning")
+            return render_template("materials/add_material.html", form=form)
+        m = Material(
+            material_id=form.material_id.data,
+            name=form.name.data,
+            quantity=form.quantity.data
+        )
+        db.session.add(m)
+        db.session.commit()
+        flash("Material added.", "success")
+        return redirect(url_for('view_materials'))
+    return render_template("materials/add_material.html", form=form)
+
+@app.route('/materials/edit/<material_id>', methods=['GET', 'POST'])
+def edit_material(material_id):
+    m = Material.query.get_or_404(material_id)
+    form = MaterialForm(obj=m)
+    if form.validate_on_submit():
+        new_id = form.material_id.data
+        if new_id != m.material_id and Material.query.get(new_id):
+            flash("New Material ID already exists.", "warning")
+            return render_template("materials/edit_material.html", form=form, material_id=material_id)
+        m.material_id = new_id
+        m.name = form.name.data
+        m.quantity = form.quantity.data
+        db.session.commit()
+        flash("Material updated.", "success")
+        return redirect(url_for('view_materials'))
+    return render_template("materials/edit_material.html", form=form, material_id=material_id)
+
+@app.route('/materials/delete/<material_id>', methods=['POST'])
+def delete_material(material_id):
+    m = Material.query.get_or_404(material_id)
+    db.session.delete(m)
+    db.session.commit()
+    flash("Material deleted.", "success")
+    return redirect(url_for('view_materials'))
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------
+# Technician Management Routes
+# -------------------------------------------------------------------------------------------------------------------------
+
+# =========================
+# Technicians CRUD (DB)
+# =========================
+@app.route('/technicians')
+def view_technicians():
+    techs = Technician.query.options(subqueryload(Technician.skills)).order_by(Technician.tech_id).all()
+    processed = []
+    for t in techs:
+        skills_str = ', '.join([ts.skill for ts in t.skills]) if t.skills else 'No skills'
+        processed.append({
+            'tech_id': t.tech_id,
+            'name': t.name,
+            'skills': skills_str,
+            'hourly_rate': f"{(t.hourly_rate or 0):.2f}",
+            'email': t.email,
+            'phone_number': t.phone_number,
+            'raw': t
+        })
+    return render_template('technicians/technicians.html', technicians=processed)
+
+@app.route('/technicians/add', methods=['GET', 'POST'])
+def add_technician():
+    form = TechnicianForm(skill_choices=_choices_skills())
+    if form.validate_on_submit():
+        if Technician.query.get(form.tech_id.data):
+            flash("Technician ID already exists.", "warning")
+            return render_template('technicians/add_technician.html', form=form)
+        t = Technician(
+            tech_id=form.tech_id.data,
+            name=form.name.data,
+            phone_number=form.phone_number.data,
+            email=form.email.data,
+            hourly_rate=form.hourly_rate.data
+        )
+        db.session.add(t)
+        # link skills
+        for s in form.skills.data:
+            db.session.add(TechnicianSkill(tech_id=t.tech_id, skill=s))
+        db.session.commit()
+        flash("Technician added.", "success")
+        return redirect(url_for('view_technicians'))
+    return render_template('technicians/add_technician.html', form=form)
+
+@app.route('/technicians/edit/<tech_id>', methods=['GET', 'POST'])
+def edit_technician(tech_id):
+    t = Technician.query.options(subqueryload(Technician.skills)).get_or_404(tech_id)
+    form = TechnicianForm(skill_choices=_choices_skills(), obj=t)
+    # preselect current skills
+    if request.method == 'GET':
+        form.skills.data = [ts.skill for ts in t.skills]
+    if form.validate_on_submit():
+        new_id = form.tech_id.data
+#/***********************************
+        old_id = t.tech_id
+        new_id = form.tech_id.data.strip()
+
+        if new_id != old_id:
+            # guard: target ID must be free
+            if Technician.query.get(new_id):
+                flash("New Technician ID already exists.", "warning")
+                return render_template('technicians/edit_technician.html', form=form, tech_id=old_id)
+
+            # 1) create NEW parent first so FKs can point to it
+            new_t = Technician(
+                tech_id=new_id,
+                name=form.name.data,
+                phone_number=form.phone_number.data,
+                email=form.email.data,
+                hourly_rate=form.hourly_rate.data,
+            )
+            db.session.add(new_t)
+            db.session.flush()  # ensure INSERT so children can reference it
+
+            # 2) reattach skills from the form to NEW id
+            for s in form.skills.data:
+                db.session.add(TechnicianSkill(tech_id=new_id, skill=s))
+
+            # 3) remove old link rows + old parent
+            TechnicianSkill.query.filter_by(tech_id=old_id).delete()
+            db.session.delete(t)
+
+            if safe_commit():
+                flash("Technician ID changed and technician updated.", "success")
+                return redirect(url_for('view_technicians'))
+            return render_template('technicians/edit_technician.html', form=form, tech_id=new_id)
+
+#*//////////////////////////////////////////
+        t.tech_id = new_id
+        t.name = form.name.data
+        t.phone_number = form.phone_number.data
+        t.email = form.email.data
+        t.hourly_rate = form.hourly_rate.data
+
+        # sync skills
+        TechnicianSkill.query.filter_by(tech_id=t.tech_id).delete()
+        for s in form.skills.data:
+            db.session.add(TechnicianSkill(tech_id=t.tech_id, skill=s))
+
+        db.session.commit()
+        flash("Technician updated.", "success")
+        return redirect(url_for('view_technicians'))
+       
+    return render_template('technicians/edit_technician.html', form=form, tech_id=tech_id)
+
+@app.route('/technicians/delete/<tech_id>', methods=['POST'])
+def delete_technician(tech_id):
+    t = Technician.query.get_or_404(tech_id)
+    db.session.delete(t)
+    db.session.commit()
+    flash("Technician deleted.", "success")
+    return redirect(url_for('view_technicians'))
+
+@app.route('/technician/<tech_id>')
+def view_technician(tech_id):
+    # Query the specific technician with their skills
+    tech = Technician.query.options(
+        subqueryload(Technician.skills)
+    ).filter_by(tech_id=tech_id).first_or_404()
+    
+    # Format the hourly rate with 2 decimal places
+    hourly_rate_str = "%.2f" % tech.hourly_rate
+    
+    return render_template('technicians/technician-details.html', 
+                         tech=tech,
+                         hourly_rate_str=hourly_rate_str)
+
+# upload technicians route
+@app.route('/upload_technicians', methods=['GET', 'POST'])
+def upload_technicians():
+    if request.method == 'POST':
+        if not (file := request.files.get('file')):
+            flash('No file selected', 'error')
+            return redirect(url_for('upload_technicians'))
+            
+        if not file.filename.endswith('.csv'):
+            flash('Only CSV files allowed', 'error')
+            return redirect(url_for('upload_technicians'))
+
+        try:
+            file.stream.seek(0)
+            csv_data = file.stream.read().decode('utf-8')
+            csv_file = io.StringIO(csv_data)
+            reader = csv.DictReader(csv_file)
+            
+            # Track results
+            counts = {
+                'added': 0,
+                'duplicates': 0,
+                'invalid_data': 0,
+                'missing_skills': 0
+            }
+
+            with db.session.begin():
+                existing_tech = {t.tech_id for t in Technician.query.with_entities(Technician.tech_id)}
+                existing_skills = {s.skill for s in Skill.query.with_entities(Skill.skill)}
+                
+                for row in reader:
+                    tech_id = (row.get('tech_id') or '').strip()
+                    name = (row.get('name') or '').strip()
+                    skills_str = (row.get('skills') or '').strip()
+                    hourly_rate_str = (row.get('hourly_rate') or '').strip()
+                    
+                    # Validate required fields
+                    if not all([tech_id, name, skills_str, hourly_rate_str]):
+                        counts['invalid_data'] += 1
+                        continue
+                        
+                    # Check duplicate
+                    if tech_id in existing_tech:
+                        counts['duplicates'] += 1
+                        continue
+                        
+                    # Validate skills
+                    skills = [s.strip() for s in skills_str.split(',') if s.strip()]
+                    if not skills or any(s not in existing_skills for s in skills):
+                        counts['missing_skills'] += 1
+                        continue
+                        
+                    # Validate hourly rate
+                    try:
+                        hourly_rate = float(hourly_rate_str)
+                        if hourly_rate <= 0:
+                            raise ValueError
+                    except ValueError:
+                        counts['invalid_data'] += 1
+                        continue
+                        
+                    # Add technician
+                    technician = Technician(
+                        tech_id=tech_id,
+                        name=name,
+                        hourly_rate=hourly_rate
+                    )
+                    db.session.add(technician)
+                    
+                    # Add skills
+                    for skill in skills:
+                        db.session.add(TechnicianSkill(
+                            tech_id=tech_id,
+                            skill=skill
+                        ))
+                    
+                    counts['added'] += 1
+                    existing_tech.add(tech_id)  # Update cache
+
+            # Generate concise flash message
+            message = (
+                f"You have successfully Added: {counts['added']} | "
+                f"Duplicates: {counts['duplicates']} | "
+                f"Invalid data: {counts['invalid_data']} | "
+                f"Missing skills: {counts['missing_skills']}"
+            )
+            
+            flash(message, 'info' if counts['added'] else 'warning')
+            return redirect(url_for('view_technicians'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Import failed: {str(e)}', 'error')
+            return redirect(url_for('upload_technicians'))
+    
+    return render_template('technicians/upload_technicians.html')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # -------------------------------------------------------------------------------------------------------------------------
 # Job Management Routes
 # -------------------------------------------------------------------------------------------------------------------------
-
-class JobForm(FlaskForm):
-    job_id = StringField('Job ID', validators=[DataRequired()])
-    description = TextAreaField('Description', validators=[DataRequired()])
-    duration = FloatField('Duration (hours)', validators=[DataRequired(), NumberRange(min=0)])
-    equipment_id = SelectField('Equipment', validators=[DataRequired()])
-    required_skills = SelectMultipleField('Required Skills', validators=[DataRequired()])
-    precedence = SelectMultipleField('Precedence Jobs')
-    required_tools = FieldList(FormField(ToolRequirementForm), min_entries=1)
-    required_materials = FieldList(FormField(MaterialRequirementForm), min_entries=1)
-    submit = SubmitField('Submit')
-
-# view jobs route
+# =========================
+# Jobs CRUD (DB)
+# =========================
 @app.route('/jobs')
 def view_jobs():
- # Query jobs with all related data
     jobs = Job.query.options(
         joinedload(Job.equipment),
         subqueryload(Job.skills),
         subqueryload(Job.precedes)
     ).order_by(Job.job_id).all()
 
-    # Format the data for display
-    formatted_jobs = []
-    for job in jobs:
-        formatted_jobs.append({
-            'job_id': job.job_id,
-            'description': job.description,
-            'duration': job.duration,
-            'equipment_id': job.equipment.equipment_id,
-            'required_skills': ', '.join([skill.skill for skill in job.skills]),
-            'precedence': ', '.join([p.precedes_job_id for p in job.precedes])
+    formatted = []
+    for j in jobs:
+        formatted.append({
+            'job_id': j.job_id,
+            'description': j.description,
+            'duration': j.duration,
+            'equipment_id': j.equipment.equipment_id if j.equipment else '',
+            'required_skills': ', '.join([s.skill for s in j.skills]),
+            'precedence': ', '.join([p.precedes_job_id for p in j.precedes])
         })
-    
-    return render_template('jobs/jobs.html', jobs=formatted_jobs)
+    return render_template('jobs/jobs.html', jobs=formatted)
 
-# add jobs route
 @app.route('/jobs/add', methods=['GET', 'POST'])
 def add_job():
-    form = JobForm()
+    form = JobForm(
+        equipment_choices=_choices_equipment(),
+        skill_choices=_choices_skills(),
+        job_choices=_choices_jobs(),
+    )
+
+    # Ensure there is at least one blank row to clone
+    if request.method == 'GET':
+        if len(form.required_tools.entries) == 0:
+            form.required_tools.append_entry()
+        if len(form.required_materials.entries) == 0:
+            form.required_materials.append_entry()
+
+    # (Re)apply nested choices every render (GET or POST)
+    tool_choices = _choices_tools()
+    material_choices = _choices_materials()
+    for entry in form.required_tools:
+        entry.form.tool_id.choices = tool_choices
+    for entry in form.required_materials:
+        entry.form.material_id.choices = material_choices
+    
     if form.validate_on_submit():
-        jobs = load_data(JOBS_FILE)
-        # Parse required_tools and required_materials
-        required_tools = []
-        tools_input = form.required_tools.data.split(',')
-        for tool in tools_input:
-            try:
-                tool_id, qty = tool.strip().split(':')
-                required_tools.append({'tool_id': tool_id.strip(), 'quantity': int(qty.strip())})
-            except ValueError:
-                flash(f'Invalid tool format: "{tool}". Use tool_id:quantity.', 'danger')
-                return render_template('jobs/add_job.html', form=form)
-        
-        required_materials = []
-        materials_input = form.required_materials.data.split(',')
-        for mat in materials_input:
-            try:
-                mat_id, qty = mat.strip().split(':')
-                required_materials.append({'material_id': mat_id.strip(), 'quantity': float(qty.strip())})
-            except ValueError:
-                flash(f'Invalid material format: "{mat}". Use material_id:quantity.', 'danger')
-                return render_template('jobs/add_job.html', form=form)
-        
-        new_job = {
-            'job_id': form.job_id.data,
-            'description': form.description.data,
-            'duration': form.duration.data,
-            'equipment_id': form.equipment_id.data,
-            'required_skills': [skill.strip() for skill in form.required_skills.data.split(',')],
-            'precedence': [p.strip() for p in form.precedence.data.split(',') if p.strip()],
-            'required_tools': required_tools,
-            'required_materials': required_materials
-        }
-        jobs.append(new_job)
-        save_data(jobs, JOBS_FILE)
-        flash('Job added successfully!', 'success')
-        return redirect(url_for('view_jobs'))
+        if Job.query.get(form.job_id.data):
+            flash("Job ID already exists.", "warning")
+            return render_template('jobs/add_job.html', form=form)
+
+        j = Job(
+            job_id=form.job_id.data,
+            description=form.description.data,
+            duration=form.duration.data,
+            equipment_id=form.equipment_id.data
+        )
+        db.session.add(j)
+
+        for s in form.required_skills.data:
+            db.session.add(JobSkill(job_id=j.job_id, skill=s))
+
+        for sub in form.required_tools.entries:
+            tid = sub.form.tool_id.data
+            qty = sub.form.quantity.data
+            if tid and qty:
+                db.session.add(JobTool(job_id=j.job_id, tool_id=tid, quantity=int(qty)))
+
+        for sub in form.required_materials.entries:
+            mid = sub.form.material_id.data
+            qty = sub.form.quantity.data
+            if mid and qty:
+                db.session.add(JobMaterial(job_id=j.job_id, material_id=mid, quantity=int(qty)))
+
+        for pid in form.precedence.data:
+            db.session.add(JobPrecedence(job_id=j.job_id, precedes_job_id=pid))
+
+        if safe_commit():
+            flash("Job added.", "success")
+            return redirect(url_for('view_jobs'))
+        else:
+            # fall through to re-render with flashed DB error
+            pass
+    else:
+        # form didn’t validate — show exactly why
+        flash_form_errors(form)
+ 
     return render_template('jobs/add_job.html', form=form)
 
-# edit jobs route
 @app.route('/jobs/edit/<job_id>', methods=['GET', 'POST'])
 def edit_job(job_id):
-    jobs = load_data(JOBS_FILE)
-    job = next((job for job in jobs if job['job_id'] == job_id), None)
-    if not job:
-        flash('Job not found.', 'danger')
-        return redirect(url_for('view_jobs'))
-    form = JobForm(data=job)
+    j = Job.query.options(
+        subqueryload(Job.skills),
+        subqueryload(Job.tools),
+        subqueryload(Job.materials),
+        subqueryload(Job.precedes),
+    ).get_or_404(job_id)
+
+    form = JobForm(
+        equipment_choices=_choices_equipment(),
+        skill_choices=_choices_skills(),
+        job_choices=_choices_jobs(exclude_id=j.job_id),
+        obj=j
+    )
+
+    if request.method == 'GET':
+        form.required_skills.data = [s.skill for s in j.skills]
+        form.precedence.data = [p.precedes_job_id for p in j.precedes]
+
+        # tools -> ensure at least one row
+        existing_tools = j.tools or []
+        if not existing_tools:
+            form.required_tools.append_entry()
+        else:
+            while len(form.required_tools.entries) < len(existing_tools):
+                form.required_tools.append_entry()
+            for entry, jt in zip(form.required_tools.entries, existing_tools):
+                entry.form.tool_id.data = jt.tool_id
+                entry.form.quantity.data = jt.quantity
+
+        # materials -> ensure at least one row
+        existing_mats = j.materials or []
+        if not existing_mats:
+            form.required_materials.append_entry()
+        else:
+            while len(form.required_materials.entries) < len(existing_mats):
+                form.required_materials.append_entry()
+            for entry, jm in zip(form.required_materials.entries, existing_mats):
+                entry.form.material_id.data = jm.material_id
+                entry.form.quantity.data = jm.quantity
+
+    # Always (re)apply nested choices
+    tool_choices = _choices_tools()
+    material_choices = _choices_materials()
+    for entry in form.required_tools:
+        entry.form.tool_id.choices = tool_choices
+    for entry in form.required_materials:
+        entry.form.material_id.choices = material_choices
+
     if form.validate_on_submit():
-        # Parse required_tools and required_materials
-        required_tools = []
-        tools_input = form.required_tools.data.split(',')
-        for tool in tools_input:
-            try:
-                tool_id, qty = tool.strip().split(':')
-                required_tools.append({'tool_id': tool_id.strip(), 'quantity': int(qty.strip())})
-            except ValueError:
-                flash(f'Invalid tool format: "{tool}". Use tool_id:quantity.', 'danger')
-                return render_template('jobs/edit_job.html', form=form, job_id=job_id)
-        
-        required_materials = []
-        materials_input = form.required_materials.data.split(',')
-        for mat in materials_input:
-            try:
-                mat_id, qty = mat.strip().split(':')
-                required_materials.append({'material_id': mat_id.strip(), 'quantity': float(qty.strip())})
-            except ValueError:
-                flash(f'Invalid material format: "{mat}". Use material_id:quantity.', 'danger')
-                return render_template('edit_job.html', form=form, job_id=job_id)
-        
-        job.update({
-            'job_id': form.job_id.data,
-            'description': form.description.data,
-            'duration': form.duration.data,
-            'equipment_id': form.equipment_id.data,
-            'required_skills': [skill.strip() for skill in form.required_skills.data.split(',')],
-            'precedence': [p.strip() for p in form.precedence.data.split(',') if p.strip()],
-            'required_tools': required_tools,
-            'required_materials': required_materials
-        })
-        save_data(jobs, JOBS_FILE)
-        flash('Job updated successfully!', 'success')
-        return redirect(url_for('view_jobs'))
-    # Pre-fill required_tools and required_materials as strings
-    form.required_tools.data = ','.join([f"{tool['tool_id']}:{tool['quantity']}" for tool in job['required_tools']])
-    form.required_materials.data = ','.join([f"{mat['material_id']}:{mat['quantity']}" for mat in job['required_materials']])
+        old_id = j.job_id
+        new_id = form.job_id.data
+
+        if new_id != old_id and Job.query.get(new_id):
+            flash("New Job ID already exists.", "warning")
+            return render_template('jobs/edit_job.html', form=form, job_id=old_id)
+
+        # Update parent
+        j.description = form.description.data
+        j.duration = form.duration.data
+        j.equipment_id = form.equipment_id.data
+
+        # If PK changed, cascade updates into link tables *before* we set j.job_id
+#*/////////////////////////////////////////////////
+        # If PK changed, do a safe copy → rehang children → fix inbound edges → delete old
+        if new_id != old_id:
+            # 1) create the NEW parent first (so FKs have a valid target)
+            new_job = Job(
+                job_id=new_id,
+                description=form.description.data,
+                duration=form.duration.data,
+                equipment_id=form.equipment_id.data
+            )
+            db.session.add(new_job)
+            db.session.flush()  # ensure INSERTed; children can now point here
+
+            # 2) reattach children from the form to the NEW id
+            # skills
+            for s in form.required_skills.data:
+                db.session.add(JobSkill(job_id=new_id, skill=s))
+            # tools
+            for sub in form.required_tools.entries:
+                tid, qty = sub.form.tool_id.data, sub.form.quantity.data
+                if tid and qty:
+                    db.session.add(JobTool(job_id=new_id, tool_id=tid, quantity=int(qty)))
+            # materials
+            for sub in form.required_materials.entries:
+                mid, qty = sub.form.material_id.data, sub.form.quantity.data
+                if mid and qty:
+                    db.session.add(JobMaterial(job_id=new_id, material_id=mid, quantity=int(qty)))
+            # outgoing precedence (edges from this job)
+            for pid in form.precedence.data:
+                db.session.add(JobPrecedence(job_id=new_id, precedes_job_id=pid))
+
+            # 3) inbound precedence (edges pointing TO this job)
+            db.session.execute(
+                text("UPDATE jobs_precedence SET precedes_job_id = :new WHERE precedes_job_id = :old"),
+                {"new": new_id, "old": old_id}
+            )
+
+            # 4) remove OLD children and the OLD parent
+            JobSkill.query.filter_by(job_id=old_id).delete()
+            JobTool.query.filter_by(job_id=old_id).delete()
+            JobMaterial.query.filter_by(job_id=old_id).delete()
+            JobPrecedence.query.filter_by(job_id=old_id).delete()
+            db.session.delete(j)  # delete the old parent row
+
+            if safe_commit():
+                flash("Job ID changed and job updated.", "success")
+                return redirect(url_for('view_jobs'))
+
+            # if commit failed, fall through to re-render with flashed DB error
+            return render_template('jobs/edit_job.html', form=form, job_id=new_id)
+
+#/*************************************************
+        # sync skills
+        JobSkill.query.filter_by(job_id=j.job_id).delete()
+        for s in form.required_skills.data:
+            db.session.add(JobSkill(job_id=j.job_id, skill=s))
+
+        # sync tools
+        JobTool.query.filter_by(job_id=j.job_id).delete()
+        for sub in form.required_tools.entries:
+            tid = sub.form.tool_id.data
+            qty = sub.form.quantity.data
+            if tid and qty:
+                db.session.add(JobTool(job_id=j.job_id, tool_id=tid, quantity=int(qty)))
+
+        # sync materials
+        JobMaterial.query.filter_by(job_id=j.job_id).delete()
+        for sub in form.required_materials.entries:
+            mid = sub.form.material_id.data
+            qty = sub.form.quantity.data
+            if mid and qty:
+                db.session.add(JobMaterial(job_id=j.job_id, material_id=mid, quantity=int(qty)))
+
+        # sync precedence
+        JobPrecedence.query.filter_by(job_id=j.job_id).delete()
+        for pid in form.precedence.data:
+            db.session.add(JobPrecedence(job_id=j.job_id, precedes_job_id=pid))
+
+        if safe_commit():
+            flash("Job updated.", "success")
+            return redirect(url_for('view_jobs'))
+        else:
+            # fall through to re-render with flashed DB error
+            pass
+    else:
+        flash_form_errors(form)
 
     return render_template('jobs/edit_job.html', form=form, job_id=job_id)
 
-# delete jobs route
 @app.route('/jobs/delete/<job_id>', methods=['POST'])
 def delete_job(job_id):
-    try:
-        job = Job.query.get_or_404(job_id)
-        db.session.delete(job)
-        db.session.commit()
-        flash('Job deleted successfully!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error deleting job: {str(e)}', 'danger')
-        current_app.logger.error(f"Failed to delete job {job_id}: {str(e)}")  # Now works
-    
+    j = Job.query.get_or_404(job_id)
+    db.session.delete(j)
+    db.session.commit()
+    flash("Job deleted.", "success")
     return redirect(url_for('view_jobs'))
+
 
 # upload jobs route
 @app.route('/jobs/upload', methods=['GET', 'POST'])
@@ -584,267 +1068,10 @@ def upload_jobs():
     
     return render_template('jobs/upload_jobs.html', equipment=equipment)
 
-# -------------------------------------------------------------------------------------------------------------------------
-# Technician Management Routes
-# -------------------------------------------------------------------------------------------------------------------------
-
-class TechnicianForm(FlaskForm):
-    tech_id = StringField('Technician ID', validators=[DataRequired()])
-    name = StringField('Name', validators=[DataRequired()])
-    hourly_rate = FloatField('Hourly Rate', validators=[DataRequired(), NumberRange(min=0)])
-    skills = StringField('Skills (comma-separated)', validators=[DataRequired()])
-    workdays = StringField('Workdays (comma-separated, 0=Mon, 6=Sun)', validators=[DataRequired()])
-    workday_start = StringField('Workday Start Time (HH:MM)', validators=[DataRequired()])
-    workday_end = StringField('Workday End Time (HH:MM)', validators=[DataRequired()])
-    submit = SubmitField('Submit')
-
-# view technicians route
-@app.route('/technicians')
-def view_technicians():
-    # Query technicians with their skills
-    technicians = Technician.query.options(
-        subqueryload(Technician.skills)
-    ).order_by(Technician.tech_id).all()
-    
-    # Pre-process the data for the template
-    processed_techs = []
-    for tech in technicians:
-        # Format skills as comma-separated string
-        skills_str = ', '.join([skill.skill for skill in tech.skills]) if tech.skills else 'No skills'
-        
-        # Format hourly rate with 2 decimal places
-        hourly_rate_str = f"{tech.hourly_rate:.2f}"
-        
-        processed_techs.append({
-            'tech_id': tech.tech_id,
-            'name': tech.name,
-            'skills': skills_str,
-            'hourly_rate': hourly_rate_str,
-            'email':tech.email,
-            'phone_number':tech.phone_number,
-            'raw': tech  # Keep original object if needed for actions
-        })
-    
-    return render_template('technicians/technicians.html', technicians=processed_techs)
 
 
-@app.route('/technician/<tech_id>')
-def view_technician(tech_id):
-    # Query the specific technician with their skills
-    tech = Technician.query.options(
-        subqueryload(Technician.skills)
-    ).filter_by(tech_id=tech_id).first_or_404()
-    
-    # Format the hourly rate with 2 decimal places
-    hourly_rate_str = "%.2f" % tech.hourly_rate
-    
-    return render_template('technicians/technician-details.html', 
-                         tech=tech,
-                         hourly_rate_str=hourly_rate_str)
-
-# add technicians route
-@app.route('/technicians/add', methods=['GET', 'POST'])
-def add_technician():
-    form = TechnicianForm()
-    if form.validate_on_submit():
-        technicians = load_data(TECHNICIANS_FILE)
-        # Parse workdays
-        try:
-            workdays = [int(day.strip()) for day in form.workdays.data.split(',')]
-        except ValueError:
-            flash('Invalid workday format. Use comma-separated integers (0=Mon, 6=Sun).', 'danger')
-            return render_template('technicians/add_technician.html', form=form)
-        
-        new_technician = {
-            'tech_id': form.tech_id.data,
-            'name': form.name.data,
-            'hourly_rate': form.hourly_rate.data,
-            'skills': [skill.strip() for skill in form.skills.data.split(',')],
-            'workdays': workdays,
-            'workday_start': form.workday_start.data,
-            'workday_end': form.workday_end.data
-        }
-        technicians.append(new_technician)
-        save_data(technicians, TECHNICIANS_FILE)
-        flash('Technician added successfully!', 'success')
-        return redirect(url_for('view_technicians'))
-    return render_template('technicians/add_technician.html', form=form)
-
-# delete technicians route
-@app.route('/technicians/delete/<tech_id>', methods=['POST'])
-def delete_technician(tech_id):
-    technicians = load_data(TECHNICIANS_FILE)
-    technicians = [tech for tech in technicians if tech['tech_id'] != tech_id]
-    save_data(technicians, TECHNICIANS_FILE)
-    flash('Technician deleted successfully!', 'success')
-    return redirect(url_for('view_technicians'))
-
-@app.route('/technicians/edit/<tech_id>', methods=['GET', 'POST'])
-def edit_technician(tech_id):
-    technicians = load_data(TECHNICIANS_FILE)
-    technician = next((tech for tech in technicians if tech['tech_id'] == tech_id), None)
-    if not technician:
-        flash('Technician not found.', 'danger')
-        return redirect(url_for('view_technicians'))
-    form = TechnicianForm(data=technician)
-    if form.validate_on_submit():
-        # Parse workdays
-        try:
-            workdays = [int(day.strip()) for day in form.workdays.data.split(',')]
-        except ValueError:
-            flash('Invalid workday format. Use comma-separated integers (0=Mon, 6=Sun).', 'danger')
-            return render_template('edit_technician.html', form=form, tech_id=tech_id)
-        
-        technician.update({
-            'tech_id': form.tech_id.data,
-            'name': form.name.data,
-            'hourly_rate': form.hourly_rate.data,
-            'skills': [skill.strip() for skill in form.skills.data.split(',')],
-            'workdays': workdays,
-            'workday_start': form.workday_start.data,
-            'workday_end': form.workday_end.data
-        })
-        save_data(technicians, TECHNICIANS_FILE)
-        flash('Technician updated successfully!', 'success')
-        return redirect(url_for('view_technicians'))
-    # Pre-fill workdays, workday_start, workday_end as strings
-    form.workdays.data = ','.join([str(day) for day in technician['workdays']])
-    return render_template('edit_technician.html', form=form, tech_id=tech_id)
-
-# upload technicians route
-@app.route('/upload_technicians', methods=['GET', 'POST'])
-def upload_technicians():
-    if request.method == 'POST':
-        if not (file := request.files.get('file')):
-            flash('No file selected', 'error')
-            return redirect(url_for('upload_technicians'))
-            
-        if not file.filename.endswith('.csv'):
-            flash('Only CSV files allowed', 'error')
-            return redirect(url_for('upload_technicians'))
-
-        try:
-            file.stream.seek(0)
-            csv_data = file.stream.read().decode('utf-8')
-            csv_file = io.StringIO(csv_data)
-            reader = csv.DictReader(csv_file)
-            
-            # Track results
-            counts = {
-                'added': 0,
-                'duplicates': 0,
-                'invalid_data': 0,
-                'missing_skills': 0
-            }
-
-            with db.session.begin():
-                existing_tech = {t.tech_id for t in Technician.query.with_entities(Technician.tech_id)}
-                existing_skills = {s.skill for s in Skill.query.with_entities(Skill.skill)}
-                
-                for row in reader:
-                    tech_id = (row.get('tech_id') or '').strip()
-                    name = (row.get('name') or '').strip()
-                    skills_str = (row.get('skills') or '').strip()
-                    hourly_rate_str = (row.get('hourly_rate') or '').strip()
-                    
-                    # Validate required fields
-                    if not all([tech_id, name, skills_str, hourly_rate_str]):
-                        counts['invalid_data'] += 1
-                        continue
-                        
-                    # Check duplicate
-                    if tech_id in existing_tech:
-                        counts['duplicates'] += 1
-                        continue
-                        
-                    # Validate skills
-                    skills = [s.strip() for s in skills_str.split(',') if s.strip()]
-                    if not skills or any(s not in existing_skills for s in skills):
-                        counts['missing_skills'] += 1
-                        continue
-                        
-                    # Validate hourly rate
-                    try:
-                        hourly_rate = float(hourly_rate_str)
-                        if hourly_rate <= 0:
-                            raise ValueError
-                    except ValueError:
-                        counts['invalid_data'] += 1
-                        continue
-                        
-                    # Add technician
-                    technician = Technician(
-                        tech_id=tech_id,
-                        name=name,
-                        hourly_rate=hourly_rate
-                    )
-                    db.session.add(technician)
-                    
-                    # Add skills
-                    for skill in skills:
-                        db.session.add(TechnicianSkill(
-                            tech_id=tech_id,
-                            skill=skill
-                        ))
-                    
-                    counts['added'] += 1
-                    existing_tech.add(tech_id)  # Update cache
-
-            # Generate concise flash message
-            message = (
-                f"You have successfully Added: {counts['added']} | "
-                f"Duplicates: {counts['duplicates']} | "
-                f"Invalid data: {counts['invalid_data']} | "
-                f"Missing skills: {counts['missing_skills']}"
-            )
-            
-            flash(message, 'info' if counts['added'] else 'warning')
-            return redirect(url_for('view_technicians'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Import failed: {str(e)}', 'error')
-            return redirect(url_for('upload_technicians'))
-    
-    return render_template('technicians/upload_technicians.html')
-
-# -------------------------------------------------------------------------------------------------------------------------
-# Equipments Management Routes
-# -------------------------------------------------------------------------------------------------------------------------
-
-@app.route('/equipments')
-def view_equipments():
-    equipments = Equipment.query.order_by(Equipment.equipment_id).all() 
-    return render_template("equipments/equipments.html", equipments=equipments)
 
 
-# -------------------------------------------------------------------------------------------------------------------------
-# Skills Management Routes
-# -------------------------------------------------------------------------------------------------------------------------
-
-@app.route('/skills')
-def view_skills():
-    skills = Skill.query.all()  
-    return render_template('skills/skills.html', skills=skills)
-
-# -------------------------------------------------------------------------------------------------------------------------
-# Tools Management Routes
-# -------------------------------------------------------------------------------------------------------------------------
-
-@app.route('/tools')
-def view_tools():
-    tools = Tool.query.order_by(Tool.tool_id).all()  # Gets all tools sorted by ID
-    return render_template("tools/tools.html", tools=tools)
-
-
-# -------------------------------------------------------------------------------------------------------------------------
-# Materials Management Routes
-# -------------------------------------------------------------------------------------------------------------------------
-
-@app.route('/materials')
-def view_materials():
-    materials_list = Material.query.order_by(Material.material_id).all() 
-    return render_template("materials/materials.html", materials=materials_list)
 
 
 # -------------------------------------------------------------------------------------------------------------------------
@@ -1065,27 +1292,34 @@ def gantt_chart_image():
 # -------------------------------------------------------------------------------------------------------------------------
 # Optimization Controls Route
 # -------------------------------------------------------------------------------------------------------------------------
-class MILPOptimizationForm(FlaskForm):
-    time_limit = IntegerField('Time Limit (seconds)', validators=[DataRequired(), NumberRange(min=1)])
-    gap = FloatField('Optimality Gap', validators=[DataRequired(), NumberRange(min=0, max=1)])
-    submit = SubmitField('Run MILP Optimization')
 
-class GAOptimizationForm(FlaskForm):
-    population_size = IntegerField('Population Size', validators=[DataRequired(), NumberRange(min=10)])
-    generations = IntegerField('Number of Generations', validators=[DataRequired(), NumberRange(min=1)])
-    mutation_rate = FloatField('Mutation Rate', validators=[DataRequired(), NumberRange(min=0, max=1)])
-    crossover_rate = FloatField('Crossover Rate', validators=[DataRequired(), NumberRange(min=0, max=1)])
-    submit = SubmitField('Run Genetic Algorithm Optimization')
 
-class ORToolsOptimizationForm(FlaskForm):
-    time_limit = IntegerField('Time Limit (seconds)', validators=[DataRequired(), NumberRange(min=1)])
-    submit = SubmitField('Run OR-Tools Optimization')
 
+#*///////////////////////////////////////////////////////////////////////////////////////////////////////////
 @app.route('/optimize', methods=['GET', 'POST'])
 def optimize():
     if request.method == 'POST':
-        algorithm = request.form.get('algorithm')
-        initial_schedule = load_data(SCHEDULE_FILE)
+        algorithm = (request.form.get('algorithm') or '').upper().strip()
+        confirmed = request.form.get('confirmed') == '1'
+
+        # Load data once
+        data = load_and_validate_data()
+
+        # If not confirmed yet, run precheck and show review page
+        if not confirmed:
+            unscheduled, feasible = precheck_jobs(data)
+            if unscheduled:
+                # Show review page listing jobs to be skipped with reasons
+                return render_template(
+                    'optimize_review.html',
+                    algorithm=algorithm,
+                    unscheduled=unscheduled,
+                    feasible_count=len(feasible),
+                    total_jobs=len(data['jobs'])
+                )
+            # No issues: fall through to run optimization immediately
+
+        # === Run the chosen optimizer ===
         start_time = time.time()
 
         try:
@@ -1093,8 +1327,9 @@ def optimize():
                 from src.optimiser_milp import optimize_schedule as optimizer
             elif algorithm == 'GA':
                 from src.optimiser_ga import optimize_schedule as optimizer
-            elif algorithm == 'ORTOOLS':
+            elif algorithm == 'ORTOOLS' or algorithm == 'OR-TOOLS':
                 from src.optimiser_ortools import optimize_schedule as optimizer
+                algorithm = 'ORTOOLS'  # normalize
             elif algorithm == 'SA':
                 from src.optimiser_sa import optimize_schedule as optimizer
             else:
@@ -1151,8 +1386,11 @@ def optimize():
 
         return redirect(url_for('optimization_results', algorithm=algorithm))
 
+    # GET: show your existing optimize page/form
     return render_template('optimize.html')
 
+
+#/***********************************************///////////////////////////////////////////////////////////
 # def save_optimized_schedule(schedule, algorithm):
 #     filename = f'optimized_schedule_{algorithm.lower()}.json'
 #     filepath = os.path.join(DATA_DIR, filename)

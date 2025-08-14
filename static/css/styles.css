@@ -1,8 +1,8 @@
 /* styles.css */
 
-/* Add custom styles here */
+/* ===== General Styling ===== */
 body {
-    /* Optional: customize the body */
+    /* Optional: customize body background or font */
 }
 
 .navbar-brand {
@@ -11,4 +11,86 @@ body {
 
 .table th, .table td {
     vertical-align: middle;
+}
+
+/* ===== Admin Panel Layout ===== */
+
+/* Keep top navbar fixed and push content down */
+.has-admin-layout .admin-layout { 
+    min-height: calc(100vh - 56px);  
+    padding-top: 56px; /* Matches fixed navbar height */
+}
+
+/* Sidebar sizing & behavior */
+.sidebar {
+  width: 280px;
+  transition: transform .25s ease, width .25s ease, margin .25s ease;
+  background: #fff;
+}
+
+/* Fixed sidebar on desktop */
+@media (min-width: 768px) {
+  #sidebar {
+    position: sticky;
+    top: 56px; /* stays under the fixed navbar because of padding-top above */
+    height: calc(100vh - 56px); /* full height minus navbar */
+    overflow-y: auto; /* scrollable if content overflows */
+    border-right: 1px solid rgba(0,0,0,.1);
+  }
+}
+
+.admin-content { 
+    min-width: 0; 
+}
+
+/* Desktop collapse (hide sidebar but keep right panel full width) */
+@media (min-width: 768px) {
+  body.sidebar-collapsed #sidebar { margin-left: -280px; }
+}
+
+/* Off-canvas for small screens (default hidden) */
+@media (max-width: 767.98px) {
+  #sidebar.sidebar-offcanvas {
+    position: fixed; top: 56px; bottom: 0; left: 0; width: 280px;
+    transform: translateX(-100%);
+    z-index: 1040; overflow-y: auto; box-shadow: none;
+  }
+  body.sidebar-open #sidebar.sidebar-offcanvas {
+    transform: translateX(0);
+    box-shadow: 0 0 20px rgba(0,0,0,.2);
+  }
+  .sidebar-backdrop {
+    position: fixed; top: 56px; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,.25); opacity:0; visibility:hidden;
+    transition: opacity .2s ease; z-index:1030;
+  }
+  body.sidebar-open .sidebar-backdrop { opacity:1; visibility:visible; }
+}
+
+/* Sidebar links + carets (Bootstrap-friendly) */
+.sidebar .section-title { font-weight: 600; }
+.sidebar .sidebar-links .nav-link { color: #495057; }
+.sidebar .sidebar-links .nav-link:hover { color: #0056b3; text-decoration: none; }
+.sidebar .sidebar-toggle { color: #212529; text-decoration: none; }
+.sidebar .sidebar-toggle:hover { text-decoration: none; }
+
+/* Caret indicator for dropdowns */
+.caret { 
+    display:inline-block; width:0; height:0; 
+    border-top:.35rem solid transparent; 
+    border-bottom:.35rem solid transparent; 
+    border-left:.45rem solid #6c757d; 
+    transition: transform .2s ease, border-left-color .2s ease; 
+}
+.caret.small { 
+    border-top-width:.3rem; 
+    border-bottom-width:.3rem; 
+    border-left-width:.4rem; 
+}
+.sidebar-toggle[aria-expanded="true"] .caret { 
+    transform: rotate(90deg); 
+    border-left-color:#007bff; 
+}
+.sidebar-toggle[aria-expanded="true"] { 
+    color:#007bff; 
 }

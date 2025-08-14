@@ -1,18 +1,36 @@
 [
     {
-        "job_id": "JOB001",
+        "job_id": "JOB003",
         "reason": [
-            "Needs 100 of tool TOOL001, only 5 available."
+            "Needs 1 of tool TOOL002, only 0 available."
         ]
     },
     {
-        "job_id": "JOB002",
+        "job_id": "JOB012",
         "reason": [
-            "Needs 500 of material MAT002, only 50 available."
+            "Needs 1 of tool TOOL002, only 0 available."
         ]
     },
     {
-        "job_id": "JOB016",
+        "job_id": "wfesdv",
+        "reason": [
+            "Duration 50.0h exceeds workday length 9h (08:00-17:00)."
+        ]
+    },
+    {
+        "job_id": "dc4",
+        "reason": [
+            "Duration 54.0h exceeds workday length 9h (08:00-17:00)."
+        ]
+    },
+    {
+        "job_id": "JOB001562",
+        "reason": [
+            "Needs 10 of tool TOOL001, only 5 available."
+        ]
+    },
+    {
+        "job_id": "95+6kj",
         "reason": [
             "No matching technicians with required skills."
         ]

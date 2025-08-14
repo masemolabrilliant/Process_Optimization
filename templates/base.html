@@ -1,82 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Shutdown Maintenance Scheduling</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <!-- Include Bootstrap CSS from CDN for styling -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    
+  <meta charset="UTF-8" />
+  <title>Shutdown Maintenance Scheduling</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- App styles first so you can override Bootstrap if needed -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <!-- Bootstrap 4.5.2 -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+  <!-- Optional: Font Awesome (icons for toggles/carets) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
-<body>
-    <!-- Navigation Menu -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <a class="navbar-brand" href="{{ url_for('index') }}">Maintenance Scheduler</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
+
+<body class="has-admin-layout">
+  <!-- Top navbar -->
+  <nav class="navbar navbar-light bg-light border-bottom fixed-top">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center">
+        <!-- Sidebar open/close (mobile & desktop collapse) -->
+        <button class="btn btn-outline-secondary mr-2" id="sidebarToggle" aria-label="Toggle sidebar">
+          <i class="fas fa-bars"></i>
         </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav">
 
+        <a class="navbar-brand mb-0 h1" href="{{ url_for('index') }}">Maintenance Scheduler</a>
+      </div>
 
-
-  <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        Manage data
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" href="{{ url_for('view_equipments') }}">Equipments</a>
-                        <a class="dropdown-item" href="{{ url_for('view_jobs') }}">Jobs</a>
-                        <a class="dropdown-item" href="{{ url_for('view_skills') }}">Skills</a>
-                        <a class="dropdown-item" href="{{ url_for('view_tools') }}">Tools</a>
-                        <a class="dropdown-item" href="{{ url_for('view_materials') }}">Material</a>
-                        <a class="dropdown-item" href="{{ url_for('view_technicians') }}">Technicians</a>
-                    </div>
-                </li>
-
-                
-                
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('optimize') }}">Optimize</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('view_metrics') }}">Metrics</a>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        Comparisons
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" href="{{ url_for('compare_initial_optimized', optimizer='MILP') }}">Initial vs MILP</a>
-                        <a class="dropdown-item" href="{{ url_for('compare_initial_optimized', optimizer='GA') }}">Initial vs GA</a>
-                        <a class="dropdown-item" href="{{ url_for('compare_initial_optimized', optimizer='OR-Tools') }}">Initial vs OR-Tools</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('compare_optimizers') }}">Compare All Optimizers</a>
-                    </div>
-                </li>
-            </ul>
-        </div>
-    </nav>
-
-
-    <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="close" data-dismiss="alert">&times;</button>
-                </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+      <!-- Keep whatever you had on the right (user, etc.) -->
+      <div class="d-flex align-items-center">
+        <!-- Example placeholder -->
+        <span class="text-muted small">v1.0</span>
+      </div>
     </div>
-    <!-- Include jQuery and Bootstrap JS from CDN -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <!-- Use the correct Bootstrap JS version -->
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <!-- Include custom JavaScript -->
-    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+  </nav>
+
+  <!-- Admin 2-pane layout -->
+  <div class="admin-layout d-md-flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class=" pl-3 sidebar sidebar-offcanvas border-right">
+      <div class="p-3 d-flex align-items-center justify-content-between">
+        <span class="section-title mb-0">Menu</span>
+
+        <!-- Collapse (desktop) -->
+        <button class="btn btn-sm btn-outline-secondary d-none d-md-inline-block" id="sidebarCollapse" title="Collapse sidebar">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+      </div>
+
+      <hr class="my-0">
+
+      <nav class="sidebar-links p-2">
+
+         <a href="{{ url_for('index') }}" class="d-flex align-items-center justify-content-between sidebar-toggle py-2 px-2"
+             >
+          <span><i class="fas fa-chart-line mr-2"></i> Dashboard</span>
+        </a>
+        <!-- Manage Data (collapsed by default) -->
+        <a class="d-flex align-items-center justify-content-between sidebar-toggle py-2 px-2"
+           data-toggle="collapse" href="#manageData" role="button" aria-expanded="false" aria-controls="manageData">
+          <span><i class="fas fa-database mr-2"></i> Manage Data</span>
+          <span class="caret small"></span>
+        </a>
+        <div class="collapse" id="manageData" data-parent="">
+          <ul class="nav flex-column pl-3">
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_equipments') }}">Equipments</a></li>
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_jobs') }}">Jobs</a></li>
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_skills') }}">Skills</a></li>
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_tools') }}">Tools</a></li>
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_materials') }}">Material</a></li>
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_technicians') }}">Technicians</a></li>
+          </ul>
+        </div>
+
+        <!-- Optimization (collapsed by default) -->
+        <a class="d-flex align-items-center justify-content-between sidebar-toggle py-2 px-2"
+           data-toggle="collapse" href="#optimization" role="button" aria-expanded="false" aria-controls="optimization">
+          <span><i class="fas fa-cogs mr-2"></i> Optimization</span>
+          <span class="caret small"></span>
+        </a>
+        <div class="collapse" id="optimization" data-parent="">
+          <ul class="nav flex-column pl-3">
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('optimize') }}">Run Optimization</a></li>
+            <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('view_metrics') }}">Metrics</a></li>
+
+            <!-- Comparison as dropdown inside a dropdown (clear that it's a dropdown) -->
+            <a class="d-flex align-items-center justify-content-between sidebar-toggle py-2 pr-2 pl-0"
+               data-toggle="collapse" href="#comparisons" role="button" aria-expanded="false" aria-controls="comparisons">
+              <span class="pl-3"><i class="fas fa-project-diagram mr-2"></i> Comparisons</span>
+              <span class="caret small"></span>
+            </a>
+            <div class="collapse" id="comparisons">
+              <ul class="nav flex-column pl-4">
+                <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('compare_initial_optimized', optimizer='MILP') }}">Initial vs MILP</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('compare_initial_optimized', optimizer='GA') }}">Initial vs GA</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="{{ url_for('compare_initial_optimized', optimizer='OR-Tools') }}">Initial vs OR-Tools</a></li>
+                <li class="nav-item pt-1 border-top mt-1"><a class="nav-link py-1" href="{{ url_for('compare_optimizers') }}">Compare All Optimizers</a></li>
+              </ul>
+            </div>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="mt-auto p-3 border-top">
+        <!-- Keep your footer as footer -->
+        <div class="small text-muted">© {{ 2025 }}</div>
+      </div>
+    </aside>
+
+    <!-- Right content panel -->
+    <main id="content" class="admin-content flex-grow-1">
+      <div class="container-fluid py-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span>&times;</span></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Backdrop for offcanvas on small screens -->
+  <div class="sidebar-backdrop"></div>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  <!-- Your app JS -->
+  <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
 </body>
 </html>

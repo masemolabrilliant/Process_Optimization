@@ -1,39 +1,53 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">Edit Technician</h1>
-    <form method="POST">
-        {{ form.hidden_tag() }}
-        <div class="form-group">
-            {{ form.tech_id.label }}
-            {{ form.tech_id(class="form-control", readonly=true) }}
-        </div>
-        <div class="form-group">
-            {{ form.name.label }}
-            {{ form.name(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ form.hourly_rate.label }}
-            {{ form.hourly_rate(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ form.skills.label }}
-            {{ form.skills(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ form.workdays.label }}
-            {{ form.workdays(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ form.workday_start.label }}
-            {{ form.workday_start(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ form.workday_end.label }}
-            {{ form.workday_end(class="form-control") }}
-        </div>
-        {{ form.submit(class="btn btn-primary") }}
-        <a href="{{ url_for('view_technicians') }}" class="btn btn-secondary">Cancel</a>
-    </form>
+  <h1 class="mb-4">Edit Technician</h1>
+
+  <form method="POST" novalidate>
+    {{ form.hidden_tag() }}
+
+    <div class="form-group">
+      {{ form.tech_id.label(class="font-weight-bold") }}
+      {# Keep editable to allow PK change as supported by the route; set to readonly if you prefer #}
+      {{ form.tech_id(class="form-control") }}
+      {% for err in form.tech_id.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+    </div>
+
+    <div class="form-group">
+      {{ form.name.label(class="font-weight-bold") }}
+      {{ form.name(class="form-control") }}
+      {% for err in form.name.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+    </div>
+
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        {{ form.email.label(class="font-weight-bold") }}
+        {{ form.email(class="form-control") }}
+        {% for err in form.email.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-6">
+        {{ form.phone_number.label(class="font-weight-bold") }}
+        {{ form.phone_number(class="form-control") }}
+        {% for err in form.phone_number.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        {{ form.hourly_rate.label(class="font-weight-bold") }}
+        {{ form.hourly_rate(class="form-control") }}
+        {% for err in form.hourly_rate.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-6">
+        {{ form.skills.label(class="font-weight-bold") }}
+        {{ form.skills(class="form-control", multiple=True) }}
+        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple skills.</small>
+        {% for err in form.skills.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+    </div>
+
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('view_technicians') }}" class="btn btn-secondary ml-2">Cancel</a>
+  </form>
 </div>
 {% endblock %}

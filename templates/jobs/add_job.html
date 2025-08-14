@@ -1,35 +1,181 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h1>Add New Job</h1>
-<form method="post">
+<div class="container">
+  <h1 class="mb-4">Add New Job</h1>
+
+  <form method="POST" novalidate>
     {{ form.hidden_tag() }}
-    <div class="form-group">
-        {{ form.job_id.label }} {{ form.job_id(class="form-control") }}
+
+    <div class="form-row">
+      <div class="form-group col-md-4">
+        {{ form.job_id.label(class="font-weight-bold") }}
+        {{ form.job_id(class="form-control", placeholder="e.g. J001") }}
+        {% for err in form.job_id.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-4">
+        {{ form.duration.label(class="font-weight-bold") }}
+        {{ form.duration(class="form-control", placeholder="Hours (e.g. 4)") }}
+        {% for err in form.duration.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-4">
+        {{ form.equipment_id.label(class="font-weight-bold") }}
+        {{ form.equipment_id(class="form-control") }}
+        {% for err in form.equipment_id.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
     </div>
+
     <div class="form-group">
-        {{ form.description.label }} {{ form.description(class="form-control") }}
+      {{ form.description.label(class="font-weight-bold") }}
+      {{ form.description(class="form-control", rows="3") }}
+      {% for err in form.description.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
     </div>
-    <div class="form-group">
-        {{ form.duration.label }} {{ form.duration(class="form-control") }}
+
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        {{ form.required_skills.label(class="font-weight-bold") }}
+        {{ form.required_skills(class="form-control", multiple=True, size=6) }}
+        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple skills.</small>
+        {% for err in form.required_skills.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-6">
+        {{ form.precedence.label(class="font-weight-bold") }}
+        {{ form.precedence(class="form-control", multiple=True, size=6) }}
+        <small class="form-text text-muted">Select jobs that must be completed before this job.</small>
+        {% for err in form.precedence.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
     </div>
-    <div class="form-group">
-        {{ form.equipment_id.label }} {{ form.equipment_id(class="form-control") }}
+
+    <!-- Required Tools -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Required Tools</strong>
+        <div>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow('tools-rows','required_tools')">Add Row</button>
+        </div>
+      </div>
+      <div class="card-body" id="tools-rows">
+        {% for entry in form.required_tools %}
+          <div class="form-row align-items-end tool-row mb-2">
+            <div class="form-group col-md-6">
+              {{ entry.form.tool_id.label(class="font-weight-bold") }}
+              {{ entry.form.tool_id(class="form-control") }}
+              {% for err in entry.form.tool_id.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+            </div>
+            <div class="form-group col-md-4">
+              {{ entry.form.quantity.label(class="font-weight-bold") }}
+              {{ entry.form.quantity(class="form-control", min="1") }}
+              {% for err in entry.form.quantity.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+            </div>
+            <div class="form-group col-md-2">
+              <button type="button" class="btn btn-outline-danger btn-block" onclick="removeRow(this, 'tools-rows')">Remove</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
     </div>
-    <div class="form-group">
-        {{ form.required_skills.label }} {{ form.required_skills(class="form-control") }}
+
+    <!-- Required Materials -->
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Required Materials</strong>
+        <div>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow('materials-rows','required_materials')">Add Row</button>
+        </div>
+      </div>
+      <div class="card-body" id="materials-rows">
+        {% for entry in form.required_materials %}
+          <div class="form-row align-items-end material-row mb-2">
+            <div class="form-group col-md-6">
+              {{ entry.form.material_id.label(class="font-weight-bold") }}
+              {{ entry.form.material_id(class="form-control") }}
+              {% for err in entry.form.material_id.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+            </div>
+            <div class="form-group col-md-4">
+              {{ entry.form.quantity.label(class="font-weight-bold") }}
+              {{ entry.form.quantity(class="form-control", min="1") }}
+              {% for err in entry.form.quantity.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+            </div>
+            <div class="form-group col-md-2">
+              <button type="button" class="btn btn-outline-danger btn-block" onclick="removeRow(this, 'materials-rows')">Remove</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
     </div>
-    <div class="form-group">
-        {{ form.required_tools.label }} {{ form.required_tools(class="form-control") }}
-        <small class="form-text text-muted">Format: tool_id:quantity (e.g., TOOL001:2, TOOL002:1)</small>
-    </div>
-    <div class="form-group">
-        {{ form.required_materials.label }} {{ form.required_materials(class="form-control") }}
-        <small class="form-text text-muted">Format: material_id:quantity (e.g., MAT001:5.5, MAT002:3.0)</small>
-    </div>
-    <div class="form-group">
-        {{ form.precedence.label }} {{ form.precedence(class="form-control") }}
-    </div>
+
     {{ form.submit(class="btn btn-primary") }}
-</form>
+    <a href="{{ url_for('view_jobs') }}" class="btn btn-secondary ml-2">Cancel</a>
+  </form>
+</div>
+
+<script>
+/* Cache a prototype of the first row so we can recreate rows even after removing all */
+document.addEventListener('DOMContentLoaded', function () {
+  cachePrototype('tools-rows');
+  cachePrototype('materials-rows');
+});
+
+function cachePrototype(containerId) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  const first = c.querySelector('.form-row');
+  if (first) {
+    c.dataset.prototype = first.outerHTML;  // save full HTML for later
+  }
+}
+
+/* Add a row; if none exist, use cached prototype */
+function addRow(containerId, fieldName) {
+  const c = document.getElementById(containerId);
+  let rows = c.querySelectorAll('.form-row');
+
+  if (rows.length === 0) {
+    // Recreate from cached prototype
+    if (!c.dataset.prototype) {
+      console.warn('No prototype cached for', containerId);
+      return;
+    }
+    c.insertAdjacentHTML('beforeend', c.dataset.prototype);
+    rows = c.querySelectorAll('.form-row');
+  } else {
+    // Clone last row
+    const clone = rows[rows.length - 1].cloneNode(true);
+    c.appendChild(clone);
+    rows = c.querySelectorAll('.form-row');
+  }
+
+  // Reindex the last row and clear values
+  const idx = rows.length - 1;
+  rows[idx].querySelectorAll('select, input').forEach(function (el) {
+    // clear value
+    if (el.tagName.toLowerCase() === 'select') el.selectedIndex = 0; else el.value = '';
+    // update name/id index
+    el.name = el.name.replace(new RegExp(fieldName + '-\\d+-'), fieldName + '-' + idx + '-');
+    el.id   = el.id.replace(new RegExp(fieldName + '-\\d+-'), fieldName + '-' + idx + '-');
+  });
+}
+
+/* Make indices contiguous so WTForms sees exactly the rows that remain */
+function renumberRows(containerId, fieldName) {
+  const c = document.getElementById(containerId);
+  const rows = c.querySelectorAll('.form-row');
+  rows.forEach((row, idx) => {
+    row.querySelectorAll('select, input').forEach(el => {
+      el.name = el.name.replace(new RegExp(fieldName + '-\\d+-'), fieldName + '-' + idx + '-');
+      el.id   = el.id.replace(new RegExp(fieldName + '-\\d+-'), fieldName + '-' + idx + '-');
+    });
+  });
+}
+
+/* Allow removing down to ZERO rows */
+function removeRow(button, containerId) {
+  const c = document.getElementById(containerId);
+  const row = button.closest('.form-row');
+  if (row) row.parentNode.removeChild(row);
+
+  const fieldName = (containerId.indexOf('tools') !== -1) ? 'required_tools' : 'required_materials';
+  renumberRows(containerId, fieldName);
+}
+</script>
+
 {% endblock %}

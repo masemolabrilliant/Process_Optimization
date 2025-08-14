@@ -1,30 +1,52 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h1>Add New Technician</h1>
-<form method="post">
+<div class="container">
+  <h1 class="mb-4">Add Technician</h1>
+
+  <form method="POST" novalidate>
     {{ form.hidden_tag() }}
+
     <div class="form-group">
-        {{ form.tech_id.label }} {{ form.tech_id(class="form-control") }}
+      {{ form.tech_id.label(class="font-weight-bold") }}
+      {{ form.tech_id(class="form-control", placeholder="e.g. T001") }}
+      {% for err in form.tech_id.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
     </div>
+
     <div class="form-group">
-        {{ form.name.label }} {{ form.name(class="form-control") }}
+      {{ form.name.label(class="font-weight-bold") }}
+      {{ form.name(class="form-control", placeholder="Full name") }}
+      {% for err in form.name.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
     </div>
-    <div class="form-group">
-        {{ form.hourly_rate.label }} {{ form.hourly_rate(class="form-control") }}
+
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        {{ form.email.label(class="font-weight-bold") }}
+        {{ form.email(class="form-control", placeholder="name@example.com") }}
+        {% for err in form.email.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-6">
+        {{ form.phone_number.label(class="font-weight-bold") }}
+        {{ form.phone_number(class="form-control", placeholder="+27 82 123 4567") }}
+        {% for err in form.phone_number.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
     </div>
-    <div class="form-group">
-        {{ form.skills.label }} {{ form.skills(class="form-control") }}
+
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        {{ form.hourly_rate.label(class="font-weight-bold") }}
+        {{ form.hourly_rate(class="form-control", placeholder="e.g. 350.00") }}
+        {% for err in form.hourly_rate.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
+      <div class="form-group col-md-6">
+        {{ form.skills.label(class="font-weight-bold") }}
+        {{ form.skills(class="form-control", multiple=True) }}
+        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple skills.</small>
+        {% for err in form.skills.errors %}<small class="text-danger">{{ err }}</small>{% endfor %}
+      </div>
     </div>
-    <div class="form-group">
-        {{ form.workdays.label }} {{ form.workdays(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.workday_start.label }} {{ form.workday_start(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.workday_end.label }} {{ form.workday_end(class="form-control") }}
-    </div>
+
     {{ form.submit(class="btn btn-primary") }}
-</form>
+    <a href="{{ url_for('view_technicians') }}" class="btn btn-secondary ml-2">Cancel</a>
+  </form>
+</div>
 {% endblock %}

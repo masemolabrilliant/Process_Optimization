@@ -1,348 +1,330 @@
-import sys
+# src/optimiser_milp.py
+"""
+MILP/CP-SAT optimizer that packs jobs as EARLY as possible while respecting:
+- working hours (multi-day horizon, no work outside the daily window)
+- precedence (predecessors must finish first)
+- single-equipment capacity
+- single-technician assignment with full-skill coverage (no overlaps per tech)
+- limited tool quantities via cumulative resource
+- material stock as total quantities (no time dimension)
+
+Primary objective:  minimize makespan (finish as early as possible overall)
+Secondary:          minimize number of used days / prefer earlier days
+Tertiary:           minimize the sum of start times (pack earlier within days)
+
+The solver *does not* intentionally leave gaps. If jobs spill to another day,
+they are scheduled at that next day's morning window, subject to constraints.
+"""
+from __future__ import annotations
+
 import os
 import json
-import datetime
-from datetime import timedelta
-from typing import Any, List, Dict, Tuple
+import math
+import datetime as dt
+from typing import Dict, Any, List, Tuple, Set, DefaultDict
+from collections import defaultdict
+
 from ortools.sat.python import cp_model
 
-# Add the root directory to the system path
+# Project root & data loader
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(PROJECT_ROOT)
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
-from src.data_handler import load_and_validate_data
+from src.data_handler import load_and_validate_data  # DB-backed loader
 
-# Data paths
-DATA_DIR = 'data'
-SCHEDULE_FILE = 'schedule.json'
 
-# Define working hours
-WORKDAY_START = datetime.time(8, 0)
-WORKDAY_END = datetime.time(17, 0)
-WORKDAYS = set([0, 1, 2, 3, 4])  # Monday=0, ..., Friday=4
+# ------------------------------ time helpers ------------------------------
 
-def datetime_to_minutes(dt: datetime.datetime, t_start: datetime.datetime) -> int:
-    return int((dt - t_start).total_seconds() / 60)
+WORKDAY_START = dt.time.fromisoformat("08:00")
+WORKDAY_END   = dt.time.fromisoformat("17:00")
+WORKDAYS = {0, 1, 2, 3, 4}  # Monday..Friday
 
-def minutes_to_datetime(minutes: int, t_start: datetime.datetime) -> datetime.datetime:
-    return t_start + timedelta(minutes=minutes)
+def _to_dt(s: str) -> dt.datetime:
+    return dt.datetime.fromisoformat(s)
 
-def generate_working_windows(t_start: datetime.datetime, t_end: datetime.datetime) -> List[Tuple[int, int]]:
-    current = t_start
-    working_windows = []
-    while current < t_end:
-        if current.weekday() in WORKDAYS:
-            day_start = datetime.datetime.combine(current.date(), WORKDAY_START)
-            day_end = datetime.datetime.combine(current.date(), WORKDAY_END)
-            if day_start < t_start:
-                day_start = t_start
-            if day_end > t_end:
-                day_end = t_end
-            if day_start < day_end:
-                start_min = datetime_to_minutes(day_start, t_start)
-                end_min = datetime_to_minutes(day_end, t_start)
-                working_windows.append((start_min, end_min))
-        current += timedelta(days=1)
-    return working_windows
+def _minutes_from(t: dt.datetime, origin: dt.datetime) -> int:
+    return int((t - origin).total_seconds() // 60)
 
-def save_optimized_schedule(schedule, optimizer_name):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    filename = f'optimized_schedule_{optimizer_name.lower()}.json'
-    filepath = os.path.join(DATA_DIR, filename)
-    with open(filepath, 'w') as f:
-        json.dump(schedule, f, indent=4, default=str)
-    print(f"\nOptimized schedule saved to {filepath}")
+def _minutes_to_dt(origin: dt.datetime, minutes: int) -> dt.datetime:
+    return origin + dt.timedelta(minutes=minutes)
 
-def save_unscheduled_jobs(jobs, optimizer_name):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    filename = f'unscheduled_jobs_{optimizer_name.lower()}.json'
-    filepath = os.path.join(DATA_DIR, filename)
-    with open(filepath, 'w') as f:
-        json.dump(jobs, f, indent=4)
-    print(f"Unscheduled jobs saved to {filepath}")
+def _build_working_days(t_start: dt.datetime, t_end: dt.datetime) -> List[Tuple[int, int, int]]:
+    """
+    Return list of (day_index, day_start_min, day_end_min) relative to t_start.
+    Only includes Mon-Fri. Clips first/last day to [t_start, t_end].
+    """
+    days: List[Tuple[int,int,int]] = []
+    cur = t_start
+    idx = 0
+    while cur < t_end:
+        if cur.weekday() in WORKDAYS:
+            d_start = dt.datetime.combine(cur.date(), WORKDAY_START)
+            d_end   = dt.datetime.combine(cur.date(), WORKDAY_END)
+            if d_start < t_start:
+                d_start = t_start
+            if d_end > t_end:
+                d_end = t_end
+            if d_start < d_end:
+                days.append((idx, _minutes_from(d_start, t_start), _minutes_from(d_end, t_start)))
+        # step to next calendar day at same time of day as cur
+        cur = dt.datetime.combine((cur + dt.timedelta(days=1)).date(), cur.time())
+        idx += 1
+    return days
 
-def optimize_schedule():
-    print("\n=== MILP Optimization Starting ===")
-    print("Loading and validating all data...")
+# ------------------------------ core optimizer ------------------------------
+
+def optimize_schedule(save: bool = True, max_time_s: int = 30) -> List[Dict[str, Any]]:
     data = load_and_validate_data()
+    t_start = _to_dt(data['t_start'])
+    t_end   = _to_dt(data['t_end'])
 
-    jobs_data = data['jobs']
-    technicians_data = data['technicians']
-    tools_data = data['tools']
-    materials_data = data['materials']
-    equipment_data = data['equipment']
+    # Working day windows (minutes from t_start)
+    day_windows = _build_working_days(t_start, t_end)
+    if not day_windows:
+        raise RuntimeError("No working windows inside planning horizon.")
+    horizon = day_windows[-1][2]  # last day end (minutes from t_start)
+    day_len = (dt.datetime.combine(dt.date.today(), WORKDAY_END) - 
+               dt.datetime.combine(dt.date.today(), WORKDAY_START)).seconds // 60
 
-    t_start = datetime.datetime.strptime(data.get('t_start', '2023-12-01T08:00:00'), '%Y-%m-%dT%H:%M:%S')
-    t_end = datetime.datetime.strptime(data.get('t_end', '2023-12-07T18:00:00'), '%Y-%m-%dT%H:%M:%S')
+    # Index entities
+    jobs = data['jobs']
+    techs = data['technicians']
+    tools = {t['tool_id']: int(t.get('quantity', 0)) for t in data.get('tools', [])}
+    materials = {m['material_id']: int(m.get('quantity', 0)) for m in data.get('materials', [])}
 
-    # ==== RESOURCE PRECHECK & JOB FILTERING ====
-    unfeasible_jobs = []
-    filtered_jobs = []
-    tool_caps = {tool["tool_id"]: tool["quantity"] for tool in tools_data}
-    material_caps = {mat["material_id"]: mat["quantity"] for mat in materials_data}
-
-    print("\nValidating job feasibility...")
-    for job in jobs_data:
+    # Pre-filter jobs: duration must fit within a workday
+    filtered_jobs: List[Dict[str, Any]] = []
+    unfeasible: List[Dict[str, Any]] = []
+    for j in jobs:
+        dur_min = int(j['duration']) * 60
         reasons = []
-        # Check tools
-        for req in job["required_tools"]:
-            avail = tool_caps.get(req["tool_id"], 0)
-            if req["quantity"] > avail:
-                reasons.append(f"Needs {req['quantity']} of tool {req['tool_id']}, only {avail} available.")
-        
-        # Check materials
-        for req in job["required_materials"]:
-            avail = material_caps.get(req["material_id"], 0)
-            if req["quantity"] > avail:
-                reasons.append(f"Needs {req['quantity']} of material {req['material_id']}, only {avail} available.")
-        
-        # Check technicians
-        required_skills = set(job['required_skills'])
-        matching_techs = [
-            tech for tech in technicians_data
-            if required_skills & set(tech['skills'])
-        ]
-        if not matching_techs:
-            reasons.append("No matching technicians with required skills.")
+        if dur_min > day_len:
+            reasons.append(f"duration {j['duration']}h exceeds workday {day_len//60}h")
+        # eligible technician check (must have all required skills)
+        req_sk = set(j.get('required_skills', []))
+        eligible_ts = [t for t in techs if req_sk.issubset(set(t.get('skills', [])))]
+        if not eligible_ts:
+            reasons.append("no technician has all required skills")
+        # tool capacity quick check
+        for need in j.get('required_tools', []):
+            cap = tools.get(need['tool_id'], 0)
+            if int(need['quantity']) > cap:
+                reasons.append(f"tool {need['tool_id']} needs {need['quantity']} > cap {cap}")
+        # material stock quick check (total)
+        for need in j.get('required_materials', []):
+            cap = materials.get(need['material_id'], 0)
+            if int(need['quantity']) > cap:
+                reasons.append(f"material {need['material_id']} needs {need['quantity']} > stock {cap}")
 
         if reasons:
-            unfeasible_jobs.append({"job_id": job["job_id"], "reason": reasons})
+            unfeasible.append({'job_id': j['job_id'], 'reason': reasons})
         else:
-            filtered_jobs.append(job)
+            j = j.copy()
+            j['_dur_min'] = dur_min
+            j['_eligible_ts'] = [t['tech_id'] for t in eligible_ts]
+            filtered_jobs.append(j)
 
-    # Inform about skipped jobs
-    if unfeasible_jobs:
-        print(f"⚠️ Skipping {len(unfeasible_jobs)} jobs due to resource constraints:")
-        for item in unfeasible_jobs[:5]:  # Show first 5 to avoid flooding console
-            print(f"- Job {item['job_id']}: {', '.join(item['reason'])}")
-        if len(unfeasible_jobs) > 5:
-            print(f"... and {len(unfeasible_jobs)-5} more")
-        save_unscheduled_jobs(unfeasible_jobs, "milp")
+    if not filtered_jobs:
+        # nothing scheduleable
+        schedule: List[Dict[str, Any]] = []
+        if save:
+            _save(schedule)
+        return schedule
 
-    jobs_data = filtered_jobs  # Only use feasible jobs!
-
-    # Handle empty job list after filtering
-    if not jobs_data:
-        print("❌ No feasible jobs remain after pre-checks. Optimization not attempted.")
-        save_optimized_schedule([], "MILP")
-        return []
-
-    print(f"\nProceeding with {len(jobs_data)} feasible jobs out of {len(jobs_data)+len(unfeasible_jobs)} total")
-
-    # Initialize model
     model = cp_model.CpModel()
-    total_minutes = int((t_end - t_start).total_seconds() / 60)
-    working_windows = generate_working_windows(t_start, t_end)
 
-    print(f"\nTime parameters:")
-    print(f"- Start: {t_start}")
-    print(f"- End: {t_end}")
-    print(f"- Total minutes: {total_minutes}")
-    print(f"- Working windows: {working_windows}")
+    # Vars per job
+    start: Dict[str, cp_model.IntVar] = {}
+    end: Dict[str, cp_model.IntVar] = {}
+    interval: Dict[str, cp_model.IntervalVar] = {}
+    # Day assignment literals a[j][k]
+    a: Dict[str, List[cp_model.BoolVar]] = {}
 
-    # ==== CREATE VARIABLES AND CONSTRAINTS ====
-    print("\nCreating variables and constraints...")
+    # Tech assignment literals y[j][t]
+    y: Dict[str, Dict[str, cp_model.BoolVar]] = defaultdict(dict)
+    tech_intervals: DefaultDict[str, List[cp_model.IntervalVar]] = defaultdict(list)
 
-    # Job variables
-    job_vars = {}
-    for job in jobs_data:
-        job_id = job['job_id']
-        duration = int(job['duration'] * 60)  # Convert hours to minutes
-        
-        start = model.NewIntVar(0, total_minutes, f'start_{job_id}')
-        end = model.NewIntVar(0, total_minutes, f'end_{job_id}')
-        
-        # Ensure job duration is correct
-        model.Add(end - start == duration)
-        
-        # Ensure job is within working windows
-        window_constraints = []
-        for w_start, w_end in working_windows:
-            is_in_window = model.NewBoolVar(f'{job_id}_in_window_{w_start}_{w_end}')
-            model.Add(start >= w_start).OnlyEnforceIf(is_in_window)
-            model.Add(end <= w_end).OnlyEnforceIf(is_in_window)
-            window_constraints.append(is_in_window)
-        model.Add(sum(window_constraints) >= 1)
-        
-        job_vars[job_id] = (start, end)
+    # Equipment NoOverlap buckets
+    equip_intervals: DefaultDict[str, List[cp_model.IntervalVar]] = defaultdict(list)
 
-    # Equipment constraints
-    print("\nAdding equipment constraints...")
-    for equip in equipment_data:
-        equip_id = equip['equipment_id']
-        equip_jobs = [j for j in jobs_data if j['equipment_id'] == equip_id]
-        if equip_jobs:
-            intervals = [
-                model.NewIntervalVar(
-                    job_vars[j['job_id']][0], 
-                    j['duration'] * 60, 
-                    job_vars[j['job_id']][1], 
-                    f'interval_{j["job_id"]}'
-                ) for j in equip_jobs
-            ]
-            model.AddNoOverlap(intervals)
-            print(f"- Equipment {equip_id}: {len(equip_jobs)} jobs")
+    # Build day bounds arrays
+    day_count = len(day_windows)
 
-    # Technician constraints
-    print("\nAdding technician constraints...")
-    tech_assignment_vars = {}
-    for tech in technicians_data:
-        tech_id = tech['tech_id']
-        tech_assignment_vars[tech_id] = {}
-        tech_intervals = []
-        
-        for job in jobs_data:
-            job_id = job['job_id']
-            if set(tech['skills']).intersection(set(job['required_skills'])):
-                is_assigned = model.NewBoolVar(f'tech_{tech_id}_assigned_to_{job_id}')
-                tech_assignment_vars[tech_id][job_id] = is_assigned
-                
-                interval = model.NewOptionalIntervalVar(
-                    job_vars[job_id][0],
-                    int(job['duration'] * 60),
-                    job_vars[job_id][1],
-                    is_assigned,
-                    f'tech_{tech_id}_interval_{job_id}'
-                )
-                tech_intervals.append(interval)
-        
-        if tech_intervals:
-            model.AddNoOverlap(tech_intervals)
-            print(f"- Technician {tech_id}: can work on {len(tech_intervals)} jobs")
+    # Create per-job variables and constraints
+    for j in filtered_jobs:
+        jid = j['job_id']
+        dur = j['_dur_min']
 
-    # Ensure each job has at least one technician with required skills
-    print("\nAdding technician assignment constraints...")
-    for job in jobs_data:
-        job_id = job['job_id']
-        tech_count = [
-            tech_assignment_vars[tech['tech_id']][job_id]
-            for tech in technicians_data
-            if job_id in tech_assignment_vars[tech['tech_id']]
-        ]
-        if tech_count:
-            model.Add(sum(tech_count) >= 1)  # At least one technician per job
-        else:
-            print(f"⚠️ Job {job_id} has no eligible technicians - this shouldn't happen after pre-check")
+        # Time vars
+        start[jid] = model.NewIntVar(0, horizon, f"start_{jid}")
+        end[jid]   = model.NewIntVar(0, horizon, f"end_{jid}")
+        model.Add(end[jid] == start[jid] + dur)
+        interval[jid] = model.NewIntervalVar(start[jid], dur, end[jid], f"iv_{jid}")
 
-    # Tool constraints
-    print("\nAdding tool constraints...")
-    for tool in tools_data:
-        tool_id = tool['tool_id']
-        tool_capacity = tool['quantity']
-        tool_usage = []
-        
-        for job in jobs_data:
-            for req_tool in job['required_tools']:
-                if req_tool['tool_id'] == tool_id:
-                    interval = model.NewIntervalVar(
-                        job_vars[job['job_id']][0],
-                        job['duration'] * 60,
-                        job_vars[job['job_id']][1],
-                        f'tool_{tool_id}_interval_{job["job_id"]}'
-                    )
-                    tool_usage.append((interval, req_tool['quantity']))
-        
-        if tool_usage:
-            model.AddCumulative([u[0] for u in tool_usage], [u[1] for u in tool_usage], tool_capacity)
-            print(f"- Tool {tool_id}: {len(tool_usage)} usages (capacity {tool_capacity})")
+        # Day selection literals
+        a[jid] = []
+        # each job must be assigned to exactly one *working* day window that can fit it
+        usable_days = 0
+        for k, (_, d_start, d_end) in enumerate(day_windows):
+            # if job can't fit that day window, skip literal
+            if d_end - d_start < dur:
+                a[jid].append(None)  # placeholder for indexing
+                continue
+            lit = model.NewBoolVar(f"a_{jid}_{k}")
+            a[jid].append(lit)
+            usable_days += 1
+            # bound start into [d_start, d_end - dur] when this day is chosen
+            model.Add(start[jid] >= d_start).OnlyEnforceIf(lit)
+            model.Add(start[jid] <= d_end - dur).OnlyEnforceIf(lit)
+        # exactly one usable day must be chosen
+        chosen_lits = [lit for lit in a[jid] if lit is not None]
+        if not chosen_lits:
+            # shouldn't happen due to pre-filter, but guard anyway
+            unfeasible.append({'job_id': jid, 'reason': [f"no day can fit duration {dur}min"]})
+            # lock job at t_start to avoid orphan; but we will not include it later
+            a[jid] = []
+            continue
+        model.Add(sum(chosen_lits) == 1)
 
-    # Material constraints
-    print("\nAdding material constraints...")
-    for material in materials_data:
-        material_id = material['material_id']
-        material_capacity = material['quantity']
-        material_usage = 0
-        
-        for job in jobs_data:
-            for req_material in job['required_materials']:
-                if req_material['material_id'] == material_id:
-                    material_usage += req_material['quantity']
-        
-        model.Add(material_usage <= material_capacity)
-        print(f"- Material {material_id}: usage {material_usage} (capacity {material_capacity})")
+        # Equipment NoOverlap
+        eq = j['equipment_id']
+        equip_intervals[eq].append(interval[jid])
 
-    # Precedence constraints
-    print("\nAdding precedence constraints...")
-    precedence_count = 0
-    for job in jobs_data:
-        for pred_id in job['precedence']:
-            if pred_id in job_vars:  # Only add if predecessor exists
-                model.Add(job_vars[job['job_id']][0] >= job_vars[pred_id][1])
-                precedence_count += 1
-    print(f"- Added {precedence_count} precedence constraints")
+        # Technician assignment (exactly ONE who covers all skills)
+        for t in j['_eligible_ts']:
+            y[jid][t] = model.NewBoolVar(f"y_{jid}_{t}")
+            # Optional interval for tech capacity using the *same* start/end
+            tech_iv = model.NewOptionalIntervalVar(start[jid], dur, end[jid], y[jid][t], f"iv_{jid}_tech_{t}")
+            tech_intervals[t].append(tech_iv)
+        model.Add(sum(y[jid].values()) == 1)
 
-    # Objective: Minimize makespan
-    makespan = model.NewIntVar(0, total_minutes, 'makespan')
-    model.AddMaxEquality(makespan, [end for _, end in job_vars.values()])
-    model.Minimize(makespan)
+    # Precedence
+    pred_map: Dict[str, Set[str]] = {j['job_id']: set(j.get('precedence', [])) for j in filtered_jobs}
+    for j in filtered_jobs:
+        jid = j['job_id']
+        for p in pred_map[jid]:
+            if p in start:  # only if predecessor is scheduleable
+                model.Add(start[jid] >= end[p])
 
-    # ==== SOLVE THE PROBLEM ====
-    print("\nSolving the problem...")
+    # Tools cumulative
+    for tool_id, cap in tools.items():
+        if cap <= 0:
+            continue
+        ivs: List[cp_model.IntervalVar] = []
+        demands: List[int] = []
+        for j in filtered_jobs:
+            # find demand
+            d = 0
+            for need in j.get('required_tools', []):
+                if need['tool_id'] == tool_id:
+                    d = int(need['quantity'])
+                    break
+            if d > 0:
+                ivs.append(interval[j['job_id']])
+                demands.append(d)
+        if ivs:
+            model.AddCumulative(ivs, demands, cap)
+
+    # Materials one-shot capacity
+    for mat_id, cap in materials.items():
+        total_need = sum(int(need['quantity'])
+                         for j in filtered_jobs
+                         for need in j.get('required_materials', [])
+                         if need['material_id'] == mat_id)
+        model.Add(total_need <= cap)
+
+    # Technician NoOverlap
+    for tech_id, ivs in tech_intervals.items():
+        # intervals carry presence literals; NoOverlap respects them
+        model.AddNoOverlap(ivs)
+
+    # Equipment NoOverlap
+    for eq_id, ivs in equip_intervals.items():
+        model.AddNoOverlap(ivs)
+
+    # Day usage indicators and objective terms
+    day_used: List[cp_model.BoolVar] = []
+    for k, (_, d_start, d_end) in enumerate(day_windows):
+        yk = model.NewBoolVar(f"day_used_{k}")
+        day_used.append(yk)
+        for j in filtered_jobs:
+            lits = a[j['job_id']]
+            if k < len(lits) and lits[k] is not None:
+                # if job chooses this day => that day is used
+                model.AddImplication(lits[k], yk)
+
+    # Makespan
+    makespan = model.NewIntVar(0, horizon, "makespan")
+    model.AddMaxEquality(makespan, [end[j['job_id']] for j in filtered_jobs])
+
+    # Total start time and total day index (earliness pressure)
+    total_start = model.NewIntVar(0, horizon * len(filtered_jobs), "total_start")
+    model.Add(total_start == sum(start[j['job_id']] for j in filtered_jobs))
+
+    total_days_used = model.NewIntVar(0, len(day_windows), "total_days_used")
+    model.Add(total_days_used == sum(day_used))
+
+    # Objective: BIG1*makespan + BIG2*total_days_used + total_start
+    BIG1 = horizon * 1000
+    BIG2 = horizon  # using minutes so this is smaller than BIG1 but strong
+    model.Minimize(BIG1 * makespan + BIG2 * total_days_used + total_start)
+
+    # Solver params
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 300.0  # 5 minutes limit
-    solver.parameters.num_search_workers = 8  # Use multiple cores
-    solver.parameters.log_search_progress = True
-    
+    solver.parameters.max_time_in_seconds = float(max_time_s)
+    solver.parameters.num_search_workers = max(4, os.cpu_count() or 4)
+    solver.parameters.log_search_progress = False
+
     status = solver.Solve(model)
 
-    # ==== INTERPRET RESULTS ====
-    optimized_schedule = []
-    if status == cp_model.OPTIMAL:
-        print("\n✅ Optimal solution found!")
-    elif status == cp_model.FEASIBLE:
-        print("\n⚠️ Feasible solution found (not necessarily optimal)")
-    else:
-        print("\n❌ No solution found")
-        print("Possible reasons:")
-        print("- Not enough technicians for the required skills")
-        print("- Resource constraints are too tight")
-        print("- Time limit was too short")
-        print(f"Solver status: {status}")
-        return []
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        # Return empty schedule; caller can show message
+        schedule: List[Dict[str, Any]] = []
+        if save:
+            _save(schedule)
+        return schedule
 
-    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-        print("\nSolution statistics:")
-        print(f"- Makespan: {solver.Value(makespan)} minutes ({solver.Value(makespan)/60:.2f} hours)")
-        print(f"- Objective value: {solver.ObjectiveValue()}")
-        print(f"- Wall time: {solver.WallTime():.2f} seconds")
-        
-        # Build the optimized schedule
-        for job in jobs_data:
-            job_id = job['job_id']
-            start_time = minutes_to_datetime(solver.Value(job_vars[job_id][0]), t_start)
-            end_time = minutes_to_datetime(solver.Value(job_vars[job_id][1]), t_start)
-            
-            assigned_technicians = [
-                tech['tech_id'] for tech in technicians_data
-                if job_id in tech_assignment_vars[tech['tech_id']] and 
-                solver.Value(tech_assignment_vars[tech['tech_id']][job_id])
-            ]
-            
-            optimized_schedule.append({
-                'job_id': job_id,
-                'equipment_id': job['equipment_id'],
-                'scheduled_start_time': start_time.strftime('%Y-%m-%dT%H:%M:%S'),
-                'scheduled_end_time': end_time.strftime('%Y-%m-%dT%H:%M:%S'),
-                'duration_hours': job['duration'],
-                'assigned_technicians': assigned_technicians
-            })
+    # Build solution
+    # Map tech assignment
+    job_to_tech: Dict[str, str] = {}
+    for j in filtered_jobs:
+        jid = j['job_id']
+        for t, lit in y[jid].items():
+            if solver.BooleanValue(lit):
+                job_to_tech[jid] = t
+                break
 
-        save_optimized_schedule(optimized_schedule, "MILP")
-        
-        # Print scheduling statistics
-        scheduled_job_ids = [job['job_id'] for job in optimized_schedule]
-        unscheduled_ids = [item['job_id'] for item in unfeasible_jobs]
-        
-        print("\n=== Scheduling Statistics ===")
-        print(f"Total jobs: {len(jobs_data)+len(unfeasible_jobs)}")
-        print(f"Scheduled jobs: {len(scheduled_job_ids)}")
-        print(f"Unscheduled jobs: {len(unscheduled_ids)}")
-        print(f"Scheduling rate: {len(scheduled_job_ids)/(len(jobs_data)+len(unfeasible_jobs))*100:.2f}%")
-        
-        return optimized_schedule
-    else:
-        print("\nNo solution found")
-        return []
+    schedule: List[Dict[str, Any]] = []
+    for j in filtered_jobs:
+        jid = j['job_id']
+        s_min = solver.Value(start[jid])
+        e_min = solver.Value(end[jid])
+        s_dt = _minutes_to_dt(t_start, s_min)
+        e_dt = _minutes_to_dt(t_start, e_min)
+        schedule.append({
+            "job_id": jid,
+            "description": j.get("description", ""),
+            "equipment_id": j.get("equipment_id"),
+            "assigned_technicians": [job_to_tech.get(jid)] if job_to_tech.get(jid) else [],
+            "scheduled_start_time": s_dt.isoformat(),
+            "scheduled_end_time": e_dt.isoformat(),
+            "duration_hours": j['duration']
+        })
+
+    # Sort by start time
+    schedule.sort(key=lambda r: r["scheduled_start_time"])
+
+    if save:
+        _save(schedule)
+
+    return schedule
+
+
+def _save(schedule: List[Dict[str, Any]], name: str = "milp") -> None:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    path = os.path.join(DATA_DIR, f"optimized_schedule_{name}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(schedule, f, indent=2)
 
 if __name__ == "__main__":
     optimize_schedule()

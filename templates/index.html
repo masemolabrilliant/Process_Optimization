@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
+<div class="container-fluid px-0">
     <h1 class="mb-4">Welcome to the Shutdown Maintenance Scheduling Application</h1>
-    
+
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-lg-6">
             <div class="card mb-4">
                 <div class="card-header">
                     <h2 class="h5 mb-0">Quick Actions</h2>
@@ -18,28 +18,25 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-lg-6">
             <div class="card mb-4">
                 <div class="card-header">
                     <h2 class="h5 mb-0">Data Management</h2>
                 </div>
                 <div class="card-body">
                     <ul class="list-group">
-                        
                         <a class="list-group-item" href="{{ url_for('view_equipments') }}">Equipments</a>
                         <a class="list-group-item" href="{{ url_for('view_jobs') }}">Jobs</a>
                         <a class="list-group-item" href="{{ url_for('view_skills') }}">Skills</a>
                         <a class="list-group-item" href="{{ url_for('view_tools') }}">Tools</a>
                         <a class="list-group-item" href="{{ url_for('view_materials') }}">Material</a>
                         <a class="list-group-item" href="{{ url_for('view_technicians') }}">Technicians</a>
-
-
                     </ul>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-header">
             <h2 class="h5 mb-0">About</h2>
